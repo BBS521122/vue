@@ -5,6 +5,7 @@ import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 
 
+// @ts-ignore
 import App from './App.vue'
 import router from './router'
 

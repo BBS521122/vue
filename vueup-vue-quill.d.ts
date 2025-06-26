@@ -1,5 +1,1 @@
-declare module '@vueup/vue-quill' {
-    import { DefineComponent } from 'vue'
-    const QuillEditor: DefineComponent<any, any, any>
-    export { QuillEditor }
-}
+这个创建位置错了，在src里面我又创建了一个。

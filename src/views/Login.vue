@@ -7,18 +7,19 @@
       </div>
 
       <el-form
-          ref="loginForm"
+          ref="loginFormRef"
           :model="loginForm"
           :rules="loginRules"
           class="login-form"
           @keyup.enter.native="handleLogin"
       >
-        <el-form-item prop="username">
+        <el-form-item prop="name">
           <el-input
-              v-model="loginForm.username"
+              v-model="loginForm.name"
               placeholder="请输入用户名"
               prefix-icon="User"
               clearable
+              :disabled="loading"
           />
         </el-form-item>
 
@@ -27,8 +28,10 @@
               v-model="loginForm.password"
               placeholder="请输入密码"
               prefix-icon="Lock"
+              type="password"
               show-password
               clearable
+              :disabled="loading"
           />
         </el-form-item>
 
@@ -40,6 +43,7 @@
                 prefix-icon="Key"
                 class="captcha-input"
                 clearable
+                :disabled="loading"
             />
             <div class="captcha-image-wrapper" @click="refreshCaptcha">
               <canvas ref="captchaCanvas" class="captcha-canvas" width="120" height="40"></canvas>
@@ -71,7 +75,8 @@
         </el-form-item>
 
         <div class="register-link">
-          还没有账号？<el-link type="primary" @click="goToRegister">立即注册</el-link>
+          还没有账号？
+          <el-link type="primary" @click="goToRegister">立即注册</el-link>
         </div>
       </el-form>
     </div>
@@ -79,29 +84,38 @@
 </template>
 
 <script>
-import {ref, reactive, onMounted} from 'vue'
+import {ref, reactive, onMounted, nextTick} from 'vue'
 import {useRouter} from 'vue-router'
+import axios from 'axios'
 import {ElMessage} from 'element-plus'
 import {RefreshRight, User, Lock, Key} from '@element-plus/icons-vue'
 
 export default {
+  name: 'LoginForm',
   components: {
     RefreshRight
   },
   setup() {
     const router = useRouter()
     const loginFormRef = ref(null)
+    const captchaCanvas = ref(null)
 
     // 表单数据
     const loginForm = reactive({
-      username: '',
+      name: '',
       password: '',
       captcha: ''
     })
 
+    // 其他状态
+    const loading = ref(false)
+    const rememberMe = ref(false)
+    const showCaptcha = ref(true)
+    const captchaText = ref('')
+
     // 表单验证规则
     const loginRules = reactive({
-      username: [
+      name: [
         {required: true, message: '请输入用户名', trigger: 'blur'},
         {min: 3, max: 20, message: '长度在3到20个字符', trigger: 'blur'}
       ],
@@ -113,7 +127,7 @@ export default {
         {required: true, message: '请输入验证码', trigger: 'blur'},
         {
           validator: (rule, value, callback) => {
-            if (showCaptcha.value && value.toLowerCase() !== captchaText.value.toLowerCase()) {
+            if (showCaptcha.value && value && value.toLowerCase() !== captchaText.value.toLowerCase()) {
               callback(new Error('验证码错误'))
             } else {
               callback()
@@ -124,14 +138,7 @@ export default {
       ]
     })
 
-    // 其他状态
-    const loading = ref(false)
-    const rememberMe = ref(false)
-    const showCaptcha = ref(true)
-    const captchaCanvas = ref(null)
-    const captchaText = ref('')
-
-// 生成随机验证码文本
+    // 生成随机验证码文本
     const generateCaptchaText = () => {
       const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
       let result = ''
@@ -142,8 +149,18 @@ export default {
       return result
     }
 
+    // 生成随机颜色
+    const getRandomColor = () => {
+      const r = Math.floor(Math.random() * 128) + 64
+      const g = Math.floor(Math.random() * 128) + 64
+      const b = Math.floor(Math.random() * 128) + 64
+      return `rgb(${r}, ${g}, ${b})`
+    }
+
     // 绘制验证码
     const drawCaptcha = () => {
+      if (!captchaCanvas.value) return
+
       const ctx = captchaCanvas.value.getContext('2d')
       const text = generateCaptchaText()
 
@@ -182,36 +199,48 @@ export default {
       }
     }
 
-    // 生成随机颜色
-    const getRandomColor = () => {
-      const r = Math.floor(Math.random() * 128) + 64
-      const g = Math.floor(Math.random() * 128) + 64
-      const b = Math.floor(Math.random() * 128) + 64
-      return `rgb(${r}, ${g}, ${b})`
-    }
-
     // 刷新验证码
     const refreshCaptcha = () => {
-      drawCaptcha()
-      loginForm.captcha = ''
+      nextTick(() => {
+        drawCaptcha()
+        loginForm.captcha = ''
+      })
     }
 
     // 登录方法
     const handleLogin = () => {
-      // 表单验证
+      if (!loginFormRef.value) return
+
       loginFormRef.value.validate(valid => {
         if (valid) {
           loading.value = true
-          // 这里执行登录API调用
-          console.log('登录信息:', {
-            username: loginForm.username,
+
+          axios.post('http://localhost:8080/user/login', {
+            name: loginForm.name,
             password: loginForm.password,
-            remember: rememberMe.value
-          })
-          setTimeout(() => {
+          }).then(res => {
             loading.value = false
-            ElMessage.success('登录成功')
-          }, 1000)
+            if (res.data.code === 200) {
+              const data = res.data.data
+              ElMessage.success('登录成功')
+              localStorage.setItem("role", data.role)
+              localStorage.setItem("token", data.token)
+              localStorage.setItem("name", data.name)
+
+              if (data.role === 'ADMIN') {
+                router.push("/home_admin")
+              } else if (data.role === 'user') {
+                router.push("/user")
+              }
+            } else {
+              refreshCaptcha() // 登录失败刷新验证码
+              ElMessage.error(res.data.message || '登录失败')
+            }
+          }).catch(err => {
+            loading.value = false
+            refreshCaptcha()
+            ElMessage.error('登录失败')
+          })
         }
       })
     }
@@ -221,16 +250,20 @@ export default {
     }
 
     onMounted(() => {
-      drawCaptcha()
+      nextTick(() => {
+        drawCaptcha()
+      })
     })
 
     return {
+      loginFormRef,
       loginForm,
       loginRules,
       loading,
       rememberMe,
       showCaptcha,
       captchaCanvas,
+      captchaText,
       goToRegister,
       handleLogin,
       refreshCaptcha,
@@ -248,6 +281,7 @@ export default {
   height: 100vh;
   background: url('@/assets/login-bg.jpg') no-repeat center center;
   background-size: cover;
+  position: relative;
 }
 
 .login-box {
@@ -256,6 +290,8 @@ export default {
   background-color: rgba(255, 255, 255, 0.9);
   border-radius: 8px;
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+  position: relative;
+  z-index: 1;
 }
 
 .logo-area {
@@ -282,55 +318,11 @@ export default {
 .captcha-container {
   display: flex;
   align-items: center;
+  gap: 10px;
 }
 
 .captcha-input {
   flex: 1;
-  margin-right: 10px;
-}
-
-.captcha-img {
-  width: 120px;
-  height: 40px;
-  cursor: pointer;
-  border-radius: 4px;
-}
-
-.forget-pwd {
-  float: right;
-}
-
-.login-btn {
-  width: 100%;
-  height: 45px;
-  font-size: 16px;
-  letter-spacing: 2px;
-}
-
-.footer {
-  margin-top: 30px;
-  text-align: center;
-  font-size: 12px;
-  color: #999;
-}
-
-.footer p {
-  margin: 5px 0;
-}
-
-.remember-forget-container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-}
-
-.forget-pwd {
-  margin-left: auto; /* 使忘记密码链接靠右 */
-}
-
-.captcha-canvas {
-  border-radius: 4px;
 }
 
 .captcha-image-wrapper {
@@ -338,6 +330,12 @@ export default {
   width: 120px;
   height: 40px;
   cursor: pointer;
+  flex-shrink: 0;
+}
+
+.captcha-canvas {
+  border-radius: 4px;
+  border: 1px solid #dcdfe6;
 }
 
 .captcha-refresh {
@@ -351,10 +349,29 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: background-color 0.3s;
 }
 
 .captcha-refresh:hover {
   background: rgba(0, 0, 0, 0.7);
+}
+
+.remember-forget-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.forget-pwd {
+  margin-left: auto;
+}
+
+.login-btn {
+  width: 100%;
+  height: 45px;
+  font-size: 16px;
+  letter-spacing: 2px;
 }
 
 .register-link {
@@ -362,5 +379,14 @@ export default {
   margin-top: 20px;
   color: #606266;
   font-size: 14px;
+}
+
+/* 确保输入框样式正常 */
+:deep(.el-input__wrapper) {
+  background-color: #fff;
+}
+
+:deep(.el-input.is-disabled .el-input__wrapper) {
+  background-color: #f5f7fa;
 }
 </style>

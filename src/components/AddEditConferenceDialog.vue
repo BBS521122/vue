@@ -34,13 +34,19 @@
 
       <el-form-item label="会议内容" prop="content">
         <div style="border: 1px solid #ccc;">
-          <Toolbar :editor="editor" :defaultConfig="toolbarConfig" style="border-bottom: 1px solid #ccc"/>
-          <Editor
-              style="height: 300px; overflow-y: auto;"
-              v-model="form.content"
-              :defaultConfig="editorConfig"
-              @onCreated="handleCreated"
-          />
+          <template v-if="editorMounted">
+            <Toolbar :editor="editor" :defaultConfig="toolbarConfig" style="border-bottom: 1px solid #ccc"/>
+            <Editor
+                :key="editorKey"
+                style="height: 300px; overflow-y: auto;"
+                v-model="form.content"
+                :defaultConfig="editorConfig"
+                @onCreated="handleCreated"
+            />
+          </template>
+          <div v-else style="height: 300px; display: flex; align-items: center; justify-content: center; color: #999;">
+            编辑器初始化中...
+          </div>
         </div>
       </el-form-item>
 
@@ -65,7 +71,7 @@
 </template>
 
 <script setup>
-import {ref, onBeforeUnmount, watch, defineProps} from 'vue'
+import {ref, onBeforeUnmount, watch, defineProps,nextTick} from 'vue'
 import {ElMessage, ElLoading} from 'element-plus'
 import {Editor, Toolbar} from '@wangeditor/editor-for-vue'
 import axios from 'axios'
@@ -90,19 +96,50 @@ watch(() => props.modelValue, val => visible.value = val)
 watch(visible, val => emit('update:modelValue', val))
 
 const isEdit = ref(false)
-watch(visible, async (val) => {
-  if (val) {
-    isEdit.value = !!props.conferenceId
-    resetForm()
-    if (isEdit.value) await loadConference(props.conferenceId)
-  }
-})
 
+const editorKey = ref(0)
+const editor = ref(null)
+const editorMounted = ref(false)
 const formRef = ref()
 const previewVisible = ref(false)
 const previewUrl = ref('')
-const editor = ref(null)
 const uploadUuid = ref(uuidv4())
+// 修改 watch visible 的逻辑
+watch(visible, async (val) => {
+  if (val) {
+    // 对话框打开时
+    isEdit.value = !!props.conferenceId
+    resetForm()
+    // 等待 DOM 更新完成后再初始化编辑器
+    await nextTick()
+    editorKey.value = Date.now() // 使用时间戳确保唯一性
+    editorMounted.value = true
+
+    if (isEdit.value) {
+      // 延迟加载数据，确保编辑器完全初始化
+      setTimeout(async () => {
+        await loadConference(props.conferenceId)
+      }, 100)
+    }
+  } else {
+    // 对话框关闭时先标记为未挂载
+    editorMounted.value = false
+
+    // 延迟销毁编辑器，避免与组件更新冲突
+    setTimeout(() => {
+      if (editor.value) {
+        try {
+          editor.value.destroy()
+        } catch (e) {
+          console.warn('编辑器销毁时出现错误:', e)
+        } finally {
+          editor.value = null
+        }
+      }
+    }, 50)
+  }
+})
+
 
 const form = ref({
   title: '',
@@ -174,11 +211,40 @@ const editorConfig = {
   }
 }
 
+// 修改 handleCreated 函数
 function handleCreated(editorInstance) {
-  editor.value = editorInstance
+  if (editorMounted.value) {
+    editor.value = editorInstance
+  }
 }
 
-onBeforeUnmount(() => editor.value?.destroy())
+// 修改 onBeforeUnmount
+onBeforeUnmount(() => {
+  editorMounted.value = false
+  if (editor.value) {
+    try {
+      editor.value.destroy()
+    } catch (e) {
+      console.warn('组件销毁时编辑器销毁出错:', e)
+    } finally {
+      editor.value = null
+    }
+  }
+})
+
+function resetForm() {
+  form.value = {
+    title: '',
+    cover: '',
+    content: '', // 确保内容被清空
+    owner: localStorage.getItem('username') || '',
+    publishTime: '',
+    expireTime: ''
+  }
+  coverFile.value = null
+  coverList.value = []
+  uploadUuid.value = uuidv4()
+}
 
 // ---------------- 加载会议 ----------------
 /**
@@ -194,6 +260,7 @@ async function loadConference(id) {
   form.value.owner = data.userName
   form.value.publishTime = data.startTime
   form.value.expireTime = data.endTime
+
 
 
   const res2 = await axios.get('/conference/get-cover', {params: {id}})
@@ -279,19 +346,6 @@ async function getFileFromSrc(src) {
 }
 
 
-function resetForm() {
-  form.value = {
-    title: '',
-    cover: '',
-    content: '',
-    owner: localStorage.getItem('username') || '',
-    publishTime: '',
-    expireTime: ''
-  }
-  coverFile.value = null
-  coverList.value = []
-  uploadUuid.value = uuidv4()
-}
 </script>
 
 <style scoped>

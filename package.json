@@ -12,12 +12,18 @@
     "type-check": "vue-tsc --build"
   },
   "dependencies": {
+    "@wangeditor/editor": "^5.1.23",
+    "@wangeditor/editor-for-vue": "^5.1.12",
     "axios": "^1.10.0",
+    "dayjs": "^1.11.13",
+    "dompurify": "^3.2.6",
     "element-plus": "^2.10.2",
     "ffmpeg-static": "^5.2.0",
     "pinia": "^3.0.1",
+    "uuid": "^11.1.0",
     "vue": "^3.5.13",
     "vue-router": "^4.5.0",
+    "wangeditor": "^4.7.15",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

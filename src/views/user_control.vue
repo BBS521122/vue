@@ -3,14 +3,24 @@
     <!-- 左侧组织架构 -->
     <el-aside width="250px" class="aside">
       <h4 style="margin-bottom: 10px;">组织架构</h4>
-      <el-input placeholder="请输入部门名称" size="small" style="margin-bottom: 10px;"/>
+      <el-input
+          v-model="orgSearchKeyword"
+          placeholder="请输入部门名称"
+          size="small"
+          style="margin-bottom: 10px;"
+          clearable
+      />
       <el-tree
           :data="organizationData"
           :props="defaultProps"
           accordion
           node-key="id"
           highlight-current
+          :filter-node-method="filterNode"
+          ref="orgTreeRef"
+          v-loading="orgLoading"
           style="max-height: calc(100vh - 160px); overflow-y: auto;"
+          @node-click="handleOrgNodeClick"
       />
     </el-aside>
 
@@ -23,6 +33,9 @@
         </el-form-item>
         <el-form-item label="手机号">
           <el-input v-model="searchForm.phone" placeholder="请输入手机号" clearable/>
+        </el-form-item>
+        <el-form-item label="部门">
+          <el-input v-model="searchForm.department" placeholder="请输入部门名称" clearable readonly/>
         </el-form-item>
         <el-form-item label="状态">
           <el-select
@@ -78,12 +91,20 @@
           <template #default="{ row }">
             <el-switch
                 v-model="row.state"
+                active-value="正常"
+                inactive-value="停用"
                 @change="handleStateChange(row)"
                 :loading="row.stateLoading"
+                :disabled="row.role === 'ADMIN'"
+                :title="row.role === 'ADMIN' ? '管理员状态不可修改' : ''"
             />
           </template>
         </el-table-column>
-        <el-table-column prop="createTime" label="创建时间"/>
+        <el-table-column prop="time" label="创建时间" width="180">
+          <template #default="{ row }">
+            {{ formatDate(row.time) }}
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="180">
           <template #default="{ row }">
             <template v-if="row.role !== 'ADMIN'">
@@ -118,12 +139,27 @@
 </template>
 
 <script setup>
-import {ref, onMounted, watch} from 'vue'
+import {ref, onMounted, watch, nextTick} from 'vue'
 import AddUserDialog from './AddUserDialog.vue'
 import EditUserDialog from './EditUserDialog.vue'
 import {ElMessage, ElMessageBox} from 'element-plus'
 import * as XLSX from 'xlsx'
 import axios from 'axios'
+import dayjs from 'dayjs'
+
+// 添加日期格式化方法
+const formatDate = (dateString) => {
+  if (!dateString) return ''
+  try {
+    return dayjs(dateString).format('YYYY-MM-DD HH:mm:ss')
+  } catch (e) {
+    console.error('日期格式化错误:', e)
+    return dateString
+  }
+}
+
+// 配置API基础URL
+const API_BASE_URL = 'http://localhost:8080'
 
 // 防抖函数
 const debounce = (fn, delay) => {
@@ -138,11 +174,13 @@ const debounce = (fn, delay) => {
 
 // 加载状态
 const loading = ref(false)
+const orgLoading = ref(false)
 
 // 查询条件
 const searchForm = ref({
   name: '',
   phone: '',
+  department: '',
   state: '',
   dates: []
 })
@@ -153,49 +191,104 @@ const total = ref(0)
 const pageSize = ref(10)
 const currentPage = ref(1)
 
+// 组织架构相关
+const organizationData = ref([])
+const allDepartments = ref([])
+const orgSearchKeyword = ref('')
+const orgTreeRef = ref(null)
+const selectedDeptId = ref(null)
+
+// 树组件配置
+const defaultProps = {
+  children: 'children',
+  label: 'deptName',
+  value: 'id'
+}
+
 // 取消令牌
 let cancelTokenSource = null
 
+// 加载组织架构数据
+const loadOrganizationData = async () => {
+  orgLoading.value = true
+  try {
+    const response = await axios.get(`${API_BASE_URL}/search-dept`)
+    const flatData = response.data
+    allDepartments.value = flatData
+
+    const buildTree = (parentId) => {
+      return flatData
+          .filter(item => item.parentId === parentId && item.status === 0)
+          .map(item => ({
+            ...item,
+            children: buildTree(item.id)
+          }))
+    }
+
+    organizationData.value = buildTree(0)
+  } catch (error) {
+    console.error('获取组织架构失败：', error)
+    ElMessage.error('获取组织架构失败')
+  } finally {
+    orgLoading.value = false
+  }
+}
+
+// 组织架构搜索过滤
+const filterNode = (value, data) => {
+  if (!value) return true
+  return data.deptName.includes(value)
+}
+
+// 监听搜索关键词变化
+watch(orgSearchKeyword, (val) => {
+  orgTreeRef.value?.filter(val)
+})
+
+// 处理组织架构节点点击
+const handleOrgNodeClick = (data) => {
+  selectedDeptId.value = data.id
+  searchForm.value.department = data.deptName
+  currentPage.value = 1
+  getUserList()
+}
+
 // 获取用户列表
 const getUserList = async () => {
-  // 取消之前的请求
   if (cancelTokenSource) {
     cancelTokenSource.cancel('Operation canceled due to new request.')
   }
 
-  // 创建新的取消令牌
   cancelTokenSource = axios.CancelToken.source()
 
   loading.value = true
   try {
-    // 如果选择了日期范围但未完整，则不发送请求
     if (searchForm.value.dates && searchForm.value.dates.length === 1) {
       return
     }
 
-    // 构建请求体数据
     const requestBody = {
       name: searchForm.value.name || undefined,
       phone: searchForm.value.phone || undefined,
+      department: searchForm.value.department || undefined,
       state: searchForm.value.state || undefined,
       startDate: searchForm.value.dates?.[0] || undefined,
-      endDate: searchForm.value.dates?.[1] || undefined
+      endDate: searchForm.value.dates?.[1] || undefined,
+      deptId: selectedDeptId.value || undefined
     }
 
-    // 过滤空值参数
     Object.keys(requestBody).forEach(key => {
       if (requestBody[key] === undefined || requestBody[key] === '') {
         requestBody[key] = null
       }
     })
 
-    // 分页参数通过URL参数传递
     const params = {
       pageNum: currentPage.value,
       pageSize: pageSize.value
     }
 
-    const response = await axios.post('http://localhost:8080/admin/get-user', requestBody, {
+    const response = await axios.post(`${API_BASE_URL}/admin/get-user`, requestBody, {
       params,
       cancelToken: cancelTokenSource.token
     })
@@ -204,7 +297,8 @@ const getUserList = async () => {
       const pageInfo = response.data.data
       userList.value = (pageInfo.list || []).map(user => ({
         ...user,
-        stateLoading: false // 为每个用户添加状态切换加载状态
+        state: user.state,
+        stateLoading: false
       }))
       total.value = pageInfo.total || 0
     } else {
@@ -228,7 +322,12 @@ const debouncedSearch = debounce(() => {
 
 // 监控搜索条件变化
 watch(
-    () => ({...searchForm.value}),
+    () => ({
+      name: searchForm.value.name,
+      phone: searchForm.value.phone,
+      state: searchForm.value.state,
+      dates: searchForm.value.dates
+    }),
     () => {
       currentPage.value = 1
       debouncedSearch()
@@ -247,10 +346,15 @@ const resetForm = () => {
   searchForm.value = {
     name: '',
     phone: '',
+    department: '',
     state: '',
     dates: []
   }
+  selectedDeptId.value = null
   currentPage.value = 1
+  if (orgTreeRef.value) {
+    orgTreeRef.value.setCurrentKey(null)
+  }
   getUserList()
 }
 
@@ -274,7 +378,6 @@ const showAddUser = () => {
 
 // 添加成功回调
 const handleAddSuccess = () => {
-  // 刷新用户列表
   getUserList()
 }
 
@@ -286,29 +389,31 @@ const handleEdit = (user) => {
 
 // 编辑成功回调
 const handleEditSuccess = () => {
-  // 刷新用户列表
   getUserList()
 }
 
 // 状态切换
 const handleStateChange = async (row) => {
+  if (row.role === 'ADMIN') {
+    ElMessage.warning('管理员状态不可修改')
+    return
+  }
+
   row.stateLoading = true
   try {
-    const response = await axios.post(`http://localhost:8080/admin/update-user-state`, {
+    const response = await axios.post(`${API_BASE_URL}/admin/update-state`, {
       id: row.id,
-      state: row.state ? 1 : 0
+      state: row.state
     })
 
     if (response.data.code === 200) {
-      ElMessage.success(`用户状态已${row.state ? '启用' : '禁用'}`)
+      ElMessage.success(`用户状态已${row.state === '正常' ? '启用' : '禁用'}`)
     } else {
-      // 如果后端返回失败，恢复原来的状态
-      row.state = !row.state
+      row.state = row.state === '正常' ? '停用' : '正常'
       ElMessage.error(response.data.message || '状态更新失败')
     }
   } catch (error) {
-    // 如果请求失败，恢复原来的状态
-    row.state = !row.state
+    row.state = row.state === '正常' ? '停用' : '正常'
     ElMessage.error('状态更新失败，请重试')
     console.error('状态更新失败：', error)
   } finally {
@@ -329,11 +434,10 @@ const handleDelete = async (row) => {
         }
     )
 
-    const response = await axios.get(`http://localhost:8080/admin/delete-user?id=${row.id}`)
+    const response = await axios.get(`${API_BASE_URL}/admin/delete-user?id=${row.id}`)
 
     if (response.data.code === 200) {
       ElMessage.success('删除成功')
-      // 如果当前页只有一条数据且不是第一页，则跳转到上一页
       if (userList.value.length === 1 && currentPage.value > 1) {
         currentPage.value -= 1
       }
@@ -347,41 +451,6 @@ const handleDelete = async (row) => {
       console.error('删除用户失败：', error)
     }
   }
-}
-
-// 组件挂载时获取数据
-onMounted(() => {
-  getUserList()
-})
-
-// 组织架构树
-const organizationData = [
-  {
-    label: '测盟汇',
-    children: [
-      {
-        label: '深圳总公司',
-        children: [
-          {label: '研发部门'},
-          {label: '市场部门'},
-          {label: '测试部门'},
-          {label: '财务部门'},
-          {label: '运维部门'}
-        ]
-      },
-      {
-        label: '长沙分公司',
-        children: [
-          {label: '市场部门'},
-          {label: '财务部门'}
-        ]
-      }
-    ]
-  }
-]
-const defaultProps = {
-  children: 'children',
-  label: 'label'
 }
 
 // 导入逻辑
@@ -402,7 +471,6 @@ const customUpload = async ({file}) => {
       const sheetName = workbook.SheetNames[0]
       const worksheet = workbook.Sheets[sheetName]
       const jsonData = XLSX.utils.sheet_to_json(worksheet)
-      console.log('导入数据：', jsonData)
 
       const formattedData = jsonData.map(item => ({
         name: item['名字']?.trim(),
@@ -417,12 +485,11 @@ const customUpload = async ({file}) => {
         nickname: item['昵称']?.trim()
       }))
 
-      // 调用后端导入接口
       try {
-        const response = await axios.post('http://localhost:8080/admin/import-user', formattedData)
+        const response = await axios.post(`${API_BASE_URL}/admin/import-user`, formattedData)
         if (response.data.code === 200) {
           ElMessage.success('导入成功！')
-          getUserList() // 重新获取用户列表
+          getUserList()
         } else {
           ElMessage.error(response.data.message || '导入失败')
         }
@@ -449,7 +516,7 @@ const handleExport = () => {
     手机号: user.phone,
     邮箱: user.email,
     角色: user.role,
-    状态: user.state ? '启用' : '禁用',
+    状态: user.state,
     创建时间: user.createTime
   }))
 
@@ -461,14 +528,12 @@ const handleExport = () => {
 
 // 模板下载
 const downloadTemplate = () => {
-  // 定义模板表头
   const headers = [
     '名字', '性别', '密码', '状态',
     '部门', '邮箱', '电话', '角色',
     '岗位', '昵称'
   ]
 
-  // 创建示例数据
   const demoData = [{
     名字: '张三',
     性别: '男',
@@ -482,16 +547,18 @@ const downloadTemplate = () => {
     昵称: '小张'
   }]
 
-  // 创建工作簿
   const wb = XLSX.utils.book_new()
   const ws = XLSX.utils.json_to_sheet(demoData, {header: headers})
 
-  // 添加工作表到工作簿
   XLSX.utils.book_append_sheet(wb, ws, '用户数据模板')
-
-  // 生成文件并下载
   XLSX.writeFile(wb, '用户导入模板.xlsx')
 }
+
+// 组件挂载时获取数据
+onMounted(async () => {
+  await loadOrganizationData()
+  getUserList()
+})
 </script>
 
 <style scoped>

@@ -225,7 +225,7 @@ export default {
               ElMessage.success('登录成功')
               localStorage.setItem("role", data.role)
               localStorage.setItem("token", data.token)
-              localStorage.setItem("name", data.name)
+              localStorage.setItem("username", data.name)
 
               if (data.role === 'ADMIN') {
                 router.push("/home_admin")

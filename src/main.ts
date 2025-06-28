@@ -24,6 +24,8 @@ axios.interceptors.request.use(
     }
 )
 
+axios.defaults.baseURL = 'http://localhost:8080';
+
 app.use(createPinia())
 app.use(router)
 app.use(ElementPlus)

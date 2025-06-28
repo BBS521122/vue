@@ -35,6 +35,16 @@ const router = createRouter({
             component: () => import('@/views/user_control.vue')
         },
         {
+            path: '/system/detail/2',
+            name: 'DepartmentManagement',
+            component: () => import('@/views/DepartmentManagement.vue')
+        },
+        {
+            path: '/system/detail/5',
+            name: 'Conference',
+            component: () => import('@/views/Conference.vue')
+        },
+        {
             path: '/profile',
             name: 'profile',
             component: () => import('@/views/profile.vue')

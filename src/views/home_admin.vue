@@ -41,56 +41,6 @@
     <el-main class="main-content">
       <!-- 搜索筛选区域 -->
       <div class="search-section">
-        <div class="search-row">
-          <div class="search-item">
-            <span class="search-label">子系统名称</span>
-            <el-input
-                v-model="searchForm.courseName"
-                placeholder="请输入子系统名称"
-                style="width: 200px;"
-                clearable
-            />
-          </div>
-          <div class="search-item">
-            <span class="search-label">课程时间</span>
-            <el-date-picker
-                v-model="searchForm.courseTime"
-                type="daterange"
-                range-separator="至"
-                start-placeholder="开始日期"
-                end-placeholder="结束日期"
-                style="width: 240px;"
-            />
-          </div>
-          <div class="search-item">
-            <span class="search-label">子系统名称</span>
-            <el-select
-                v-model="searchForm.courseType"
-                placeholder="请选择子系统名称"
-                style="width: 200px;"
-                clearable
-            >
-              <el-option label="用户管理" value="software"/>
-              <el-option label="计算机网络" value="network"/>
-              <el-option label="软件系统设计" value="design"/>
-              <el-option label="需求分析与设计" value="analysis"/>
-            </el-select>
-          </div>
-          <div class="search-buttons">
-            <el-button type="primary" @click="handleSearch">
-              <el-icon>
-                <Search/>
-              </el-icon>
-              搜索
-            </el-button>
-            <el-button @click="handleReset">
-              <el-icon>
-                <Refresh/>
-              </el-icon>
-              重置
-            </el-button>
-          </div>
-        </div>
         <div class="action-row">
           <el-button type="primary" @click="handleAddCourse">
             <el-icon>
@@ -101,87 +51,114 @@
         </div>
       </div>
 
-      <!-- 功能卡片网格 -->
-      <div class="course-grid">
+      <!-- 圆形卡片容器 -->
+      <div class="circle-container">
         <div
-            v-for="course in courseList"
+            v-for="(course, index) in courseList"
             :key="course.id"
-            class="course-card"
+            class="circle-card"
+            :style="getCardPosition(index)"
             @click="handleCardClick(course.id)"
         >
-          <div class="course-image">
-            <img :src="course.image" :alt="course.title"/>
-            <div
-                class="course-tag"
-                :class="{
-                'tag-active': course.tag === '进行中',
-                'tag-finished': course.tag === '已结束'
-              }"
-            >
-              {{ course.tag }}
+          <div class="card-content">
+            <div class="course-image">
+              <img :src="course.image" :alt="course.title"/>
+              <div
+                  class="course-tag"
+                  :class="{
+                  'tag-active': course.tag === '进行中',
+                  'tag-finished': course.tag === '已结束'
+                }"
+              >
+                {{ course.tag }}
+              </div>
             </div>
-          </div>
-          <div class="course-content">
-            <h3 class="course-title">{{ course.title }}</h3>
-            <p class="course-description">{{ course.description }}</p>
-            <div class="course-stats">
-              <span class="stat-item">
-                <el-icon><User/></el-icon>
-                {{ course.students }}
-              </span>
-              <span class="stat-item">
-                <el-icon><Star/></el-icon>
-                {{ course.rating }}
-              </span>
-              <span class="stat-item">
-                <el-icon><View/></el-icon>
-                {{ course.views }}
-              </span>
-              <span class="stat-item">
-                <el-icon><Clock/></el-icon>
-                {{ course.duration }}
-              </span>
-              <span class="stat-item status">{{ course.status }}</span>
+            <div class="course-info">
+              <h3 class="course-title">{{ course.title }}</h3>
+              <div class="course-stats">
+                <span class="stat-item">
+                  <el-icon><User/></el-icon>
+                  {{ course.students }}
+                </span>
+                <span class="stat-item">
+                  <el-icon><Star/></el-icon>
+                  {{ course.rating }}
+                </span>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- 分页 -->
-      <div class="pagination-wrapper">
-        <el-pagination
-            v-model:current-page="currentPage"
-            v-model:page-size="pageSize"
-            :page-sizes="[12, 24, 48, 96]"
-            :total="total"
-            layout="total, sizes, prev, pager, next, jumper"
-            @size-change="handleSizeChange"
-            @current-change="handleCurrentChange"
-        />
+      <!-- 控制按钮和分页 -->
+      <div class="bottom-controls">
+        <div class="circle-controls">
+          <el-button @click="rotateLeft" circle>
+            <el-icon><ArrowLeft /></el-icon>
+          </el-button>
+          <el-button @click="rotateRight" circle>
+            <el-icon><ArrowRight /></el-icon>
+          </el-button>
+        </div>
+        <div class="pagination-wrapper">
+          <el-pagination
+              v-model:current-page="currentPage"
+              v-model:page-size="pageSize"
+              :page-sizes="[12, 24, 48, 96]"
+              :total="total"
+              layout="total, sizes, prev, pager, next, jumper"
+              @size-change="handleSizeChange"
+              @current-change="handleCurrentChange"
+          />
+        </div>
       </div>
     </el-main>
   </div>
 </template>
 
 <script setup lang="ts">
-import {ref, reactive, onMounted} from 'vue'
-import {useRouter} from "vue-router";
+import { ref, reactive, onMounted } from 'vue'
+import { useRouter } from "vue-router";
 import axios from "axios";
-import {ElMessage} from "element-plus";
+import { ElMessage } from "element-plus";
+import { ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
 
 const router = useRouter()
+
+// 旋转角度
+const rotationAngle = ref(0)
+
+// 计算卡片位置
+const getCardPosition = (index: number) => {
+  const radius = window.innerWidth < 768 ? 180 : 280 // 响应式半径
+  const angle = (index * (360 / courseList.value.length) + rotationAngle.value)
+  const radian = angle * Math.PI / 180
+  const x = radius * Math.cos(radian)
+  const y = radius * Math.sin(radian)
+
+  // 根据位置计算缩放比例（前面的卡片大，后面的小）
+  const scale = 0.7 + 0.3 * (y + radius) / (2 * radius)
+
+  return {
+    transform: `translate(${x}px, ${y}px) scale(${scale})`,
+    zIndex: Math.round(y + radius), // 根据Y轴位置设置z-index
+    opacity: scale // 透明度也随缩放变化
+  }
+}
+
+// 旋转控制
+const rotateLeft = () => {
+  rotationAngle.value += 360 / courseList.value.length
+}
+
+const rotateRight = () => {
+  rotationAngle.value -= 360 / courseList.value.length
+}
 
 // 点击卡片跳转到课程详情页
 const handleCardClick = (courseId: number) => {
   router.push(`/system/detail/${courseId}`)
 }
-
-// 搜索表单
-const searchForm = reactive({
-  courseName: '',
-  courseTime: '',
-  courseType: ''
-})
 
 // 分页数据
 const currentPage = ref(1)
@@ -194,7 +171,7 @@ const courseList = ref([
     id: 1,
     title: '用户管理子系统',
     description: '2023级软件系统开发实训',
-    image: '/course1.jpg',
+    image: 'https://via.placeholder.com/300x200?text=Course1',
     tag: '进行中',
     students: 48,
     rating: 4.8,
@@ -205,8 +182,8 @@ const courseList = ref([
   {
     id: 2,
     title: '组织管理子系统',
-    description: '欢迎加入我们的计算机网络课程！本课程旨在为您提供计算机网络领域的全面知识，课程内容涵盖计算机网络的...',
-    image: '/course2.jpg',
+    description: '欢迎加入我们的计算机网络课程！本课程旨在为您提供计算机网络领域的全面知识',
+    image: 'https://via.placeholder.com/300x200?text=Course2',
     tag: '进行中',
     students: 40,
     rating: 4.7,
@@ -217,8 +194,8 @@ const courseList = ref([
   {
     id: 3,
     title: '行业动态管理子系统',
-    description: '《软件系统设计实训》是一门软件工程专业实训课，本课程旨在为学生提供和掌握软件系统分析...',
-    image: '/course3.jpg',
+    description: '《软件系统设计实训》是一门软件工程专业实训课',
+    image: 'https://via.placeholder.com/300x200?text=Course3',
     tag: '已结束',
     students: 32,
     rating: 4.6,
@@ -229,8 +206,8 @@ const courseList = ref([
   {
     id: 4,
     title: '课程管理子系统',
-    description: '《软件需求分析与设计》为全日制大学本科软件工程专业的专业课程与学位课程。《软件需求分析与设计》...',
-    image: '/course4.jpg',
+    description: '《软件需求分析与设计》为全日制大学本科软件工程专业的专业课程',
+    image: 'https://via.placeholder.com/300x200?text=Course4',
     tag: '已结束',
     students: 48,
     rating: 4.8,
@@ -241,30 +218,28 @@ const courseList = ref([
   {
     id: 5,
     title: '会议管理子系统',
-    description: '《软件需求分析与设计》为全日制大学本科软件工程专业的专业课程与学位课程。《软件需求分析与设计》...',
-    image: '/course4.jpg',
+    description: '会议管理子系统描述信息',
+    image: 'https://via.placeholder.com/300x200?text=Course5',
     tag: '已结束',
     students: 48,
     rating: 4.8,
     views: 284,
     duration: '0',
     status: '必修课'
+  },
+  {
+    id: 6,
+    title: '资源管理子系统',
+    description: '资源管理子系统描述信息',
+    image: 'https://via.placeholder.com/300x200?text=Course6',
+    tag: '进行中',
+    students: 36,
+    rating: 4.5,
+    views: 210,
+    duration: '1.5',
+    status: '选修课'
   }
 ])
-
-// 搜索处理
-const handleSearch = () => {
-  console.log('搜索', searchForm)
-}
-
-// 重置处理
-const handleReset = () => {
-  Object.assign(searchForm, {
-    courseName: '',
-    courseTime: '',
-    courseType: ''
-  })
-}
 
 // 新增课程
 const handleAddCourse = () => {
@@ -280,14 +255,9 @@ const handleCurrentChange = (val: number) => {
   currentPage.value = val
 }
 
-onMounted(() => {
-  // 初始化数据
-})
-
 const handleLogout = async () => {
   try {
-    const token = localStorage.getItem('token') // 获取当前token
-
+    const token = localStorage.getItem('token')
     const response = await axios.post('http://localhost:8080/user/layout', null, {
       headers: {
         'Authorization': `Bearer ${token}`
@@ -306,7 +276,6 @@ const handleLogout = async () => {
     console.error('登出异常:', err)
   }
 }
-
 </script>
 
 <style scoped>
@@ -386,77 +355,136 @@ const handleLogout = async () => {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.search-row {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
-}
-
-.search-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.search-label {
-  font-size: 14px;
-  color: #606266;
-  white-space: nowrap;
-}
-
-.search-buttons {
-  display: flex;
-  gap: 12px;
-}
-
 .action-row {
   display: flex;
   justify-content: flex-start;
 }
 
-.course-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 20px;
-  margin-bottom: 20px;
+/* 圆形布局样式 */
+.circle-container {
+  position: relative;
+  width: 100%;
+  height: 600px;
+  margin: 40px auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
-.course-card {
+.circle-card {
+  position: absolute;
+  width: 200px;
+  height: 260px;
+  left: 50%;
+  top: 50%;
+  margin-left: -100px;
+  margin-top: -130px;
+  transition: all 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+  transform-origin: center;
+  cursor: pointer;
+}
+
+.card-content {
   background: white;
-  border-radius: 8px;
+  border-radius: 12px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+  padding: 16px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s, box-shadow 0.2s;
 }
 
-.course-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+.card-content:hover {
+  transform: scale(1.05);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
 }
 
 .course-image {
   position: relative;
-  height: 180px;
+  height: 140px;
   overflow: hidden;
+  border-radius: 8px;
+  margin-bottom: 12px;
 }
 
 .course-image img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 0.5s;
 }
 
+.card-content:hover .course-image img {
+  transform: scale(1.1);
+}
+
+.course-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.course-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: #303133;
+  margin: 0 0 8px 0;
+  line-height: 1.4;
+  text-align: center;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.course-stats {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  font-size: 12px;
+  color: #909399;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 底部控制区域 */
+.bottom-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 40px;
+}
+
+.circle-controls {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.pagination-wrapper {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+/* 标签样式 */
 .course-tag {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 10px;
+  right: 10px;
   color: white;
   padding: 4px 8px;
   border-radius: 4px;
   font-size: 12px;
   font-weight: 500;
+  z-index: 2;
 }
 
 .course-tag.tag-active {
@@ -467,73 +495,25 @@ const handleLogout = async () => {
   background: #909399;
 }
 
-.course-content {
-  padding: 16px;
-}
-
-.course-title {
-  font-size: 16px;
-  font-weight: bold;
-  color: #303133;
-  margin: 0 0 8px 0;
-  line-height: 1.4;
-}
-
-.course-description {
-  font-size: 14px;
-  color: #606266;
-  line-height: 1.5;
-  margin: 0 0 12px 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.course-stats {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  font-size: 12px;
-}
-
-.stat-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: #909399;
-}
-
-.stat-item.status {
-  background: #f0f9ff;
-  color: #409eff;
-  padding: 2px 6px;
-  border-radius: 4px;
-  margin-left: auto;
-}
-
-.pagination-wrapper {
-  display: flex;
-  justify-content: center;
-  padding: 20px 0;
-}
-
+/* 响应式设计 */
 @media (max-width: 768px) {
-  .search-row {
-    flex-direction: column;
-    align-items: stretch;
+  .circle-container {
+    height: 400px;
   }
 
-  .search-item {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 4px;
+  .circle-card {
+    width: 150px;
+    height: 200px;
+    margin-left: -75px;
+    margin-top: -100px;
   }
 
-  .course-grid {
-    grid-template-columns: 1fr;
+  .course-image {
+    height: 100px;
+  }
+
+  .course-title {
+    font-size: 14px;
   }
 }
 </style>
-

@@ -226,6 +226,7 @@ export default {
               localStorage.setItem("role", data.role)
               localStorage.setItem("token", data.token)
               localStorage.setItem("username", data.name)
+              localStorage.setItem("id", data.id)
 
               if (data.role === 'ADMIN') {
                 router.push("/home_admin")

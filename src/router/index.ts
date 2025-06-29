@@ -45,6 +45,11 @@ const router = createRouter({
             component: () => import('@/views/Conference.vue')
         },
         {
+            path: '/system/detail/6',
+            name: 'Tenant',
+            component: () => import('@/views/tenant.vue')
+        },
+        {
             path: '/profile',
             name: 'profile',
             component: () => import('@/views/profile.vue')

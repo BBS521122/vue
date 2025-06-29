@@ -229,8 +229,8 @@ const courseList = ref([
   },
   {
     id: 6,
-    title: '资源管理子系统',
-    description: '资源管理子系统描述信息',
+    title: '租户管理子系统',
+    description: '租户管理子系统描述信息',
     image: 'https://via.placeholder.com/300x200?text=Course6',
     tag: '进行中',
     students: 36,

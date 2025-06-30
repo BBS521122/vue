@@ -21,6 +21,11 @@
       <el-table-column prop="title" label="新闻标题" />
       <el-table-column prop="author" label="作者" />
       <el-table-column prop="summary" label="简介" />
+      <el-table-column v-if="role==='ADMIN'" prop="status" label="状态">
+        <template #default="{ row }">
+          <el-tag :type="statusTagType(row.status)">{{ row.status }}</el-tag>
+        </template>
+      </el-table-column>
       <el-table-column label="操作" width="180">
         <template #default="scope">
           <el-button type="primary" size="small" @click="restoreNews(scope.row)">恢复</el-button>
@@ -57,7 +62,11 @@ import { ref, watch, computed } from 'vue'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
-const props = defineProps<{ modelValue: boolean }>()
+const props = defineProps<{
+  modelValue: boolean
+  tenantId?: number
+  role?: 'ADMIN' | 'user'
+}>()
 const emit = defineEmits<{ (e: 'update:modelValue', val: boolean): void; (e: 'reloaded'): void }>()
 
 const dialogVisible = ref(false)
@@ -71,10 +80,22 @@ watch(() => props.modelValue, (newVal) => {
 })
 
 watch(dialogVisible, (newVal) => emit('update:modelValue', newVal))
-
+function statusTagType(status: string): string {
+  switch (status) {
+    case '已通过': return 'success'
+    case '待审核': return 'warning'
+    case '已拒绝': return 'danger'
+    default: return ''
+  }
+}
 function loadRecycleNews() {
   loading.value = true
-  axios.get('http://localhost:8080/api/news/recycle-bin')
+
+  const url = props.role === 'ADMIN'
+      ? 'http://localhost:8080/api/news/recycle-bin'
+      : `http://localhost:8080/api/news/recycle-bin?tenantId=${props.tenantId}`
+
+  axios.get(url)
       .then(res => { recycleNews.value = res.data })
       .catch(() => ElMessage.error('加载回收站失败'))
       .finally(() => { loading.value = false })

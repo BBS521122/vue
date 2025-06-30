@@ -48,25 +48,38 @@
         </div>
       </el-form-item>
 
-      <el-form-item label="排序" prop="sortOrder">
+      <el-form-item label="排序">
         <el-tooltip
-            :content="isEdit ? '修改排序值会重新排序所有资讯' : '新增资讯只能选择0到初始值之间的位置'"
+            :content="props.isAdmin
+    ? '可选排序值，越小越靠前'
+    : (!props.isEdit
+        ? '默认排在最后，普通用户需审核通过后可修改'
+        : (form.status === '已拒绝'
+            ? '已拒绝的资讯不可修改排序'
+            : '可选排序值，越小越靠前'))"
             placement="top"
         >
-          <el-input-number
+
+        <el-input-number
               v-model="form.sortOrder"
               :min="0"
               :max="isEdit ? maxSortOrder : initialSortOrder"
-              :disabled="false"
+              :disabled="!allowSortInput"
+          placeholder="默认排到最后"
           />
         </el-tooltip>
+
         <div class="sort-tip" v-if="isEdit">
-          当前位置: {{ form.sortOrder }} (可调整范围: 0 - {{ maxSortOrder }})
+          当前排序值: {{ form.sortOrder }} (范围: 0 - {{ maxSortOrder }})
+        </div>
+        <div class="sort-tip" v-else-if="props.isAdmin">
+          可选择排序值，范围: 0 - {{ initialSortOrder }}
         </div>
         <div class="sort-tip" v-else>
-          初始位置: {{ initialSortOrder }} (允许范围: 0 - {{ initialSortOrder }})
+          审核通过后资讯将默认排在最后，可在“查看审核状态”中修改
         </div>
       </el-form-item>
+
 
       <el-form-item label="内容" prop="content">
         <div style="border: 1px solid #ccc">
@@ -106,11 +119,14 @@ interface NewsItem {
   author: string
   summary: string
   content: string
+  tenantId: number
+  status?: string
 }
 
 const props = defineProps<{
   visible: boolean
   isEdit: boolean
+  isAdmin: boolean
   modelValue: NewsItem
   maxSortOrder: number // 父组件传入的最大排序值
 }>()
@@ -123,6 +139,12 @@ const emit = defineEmits<{
 
 const formRef = ref<FormInstance>()
 const form = ref<NewsItem>({ ...props.modelValue, sortOrder: props.modelValue.sortOrder ?? 0 })
+const allowSortInput = computed(() => {
+  if (props.isAdmin) return true
+  if (!props.isEdit) return false
+  return form.value.status === '已通过'
+})
+
 const lastImagePath = ref('')
 const hasSaved = ref(false)
 const editorRef = ref<IDomEditor | null>(null)

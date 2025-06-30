@@ -4,11 +4,27 @@ import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import NewsDialog from '@/components/NewsDialog.vue'
 import RecycleBin from '@/components/RecycleBin.vue'
+import AuditDialog from '@/components/AuditDialog.vue'
+import AuditStatusDialog from '@/components/AuditStatusDialog.vue'
+
 
 const dialogKey = ref(0)
 const recycleBinVisible = ref(false)
 const tableRef = ref<any>(null)
 const currentRowKey = ref<number | null>(null)
+const role = 'ADMIN'
+const auditDialogVisible = ref(false)
+const auditStatusDialogVisible = ref(false)
+function openAuditDialog() {
+  auditDialogVisible.value = true
+}
+function openAuditStatusDialog() {
+  auditStatusDialogVisible.value = true
+}
+function onAuditReloaded() {
+  // 审核完后，刷新新闻列表
+  loadNews()
+}
 
 watch(recycleBinVisible, (newVal, oldVal) => {
   if (!newVal && oldVal) {
@@ -28,6 +44,8 @@ interface NewsItem {
   author: string
   summary: string
   content: string
+  tenantId: number
+  status?: string
 }
 
 const allNews = ref<NewsItem[]>([])
@@ -71,7 +89,9 @@ const form = ref<NewsItem>({
   summary: '',
   imagePath: '',
   content: '',
-  sortOrder: 0
+  sortOrder: 0,
+  tenantId: 1,
+  status: '已通过'
 })
 
 // 计算最小可用排序值（无空位）
@@ -118,7 +138,8 @@ watch(dialogVisible, (val) => {
       summary: '',
       imagePath: '',
       content: '',
-      sortOrder: 0
+      sortOrder: 0,
+      tenantId: 1
     }
     currentRowKey.value = null
   }
@@ -152,7 +173,8 @@ async function handleAdd() {
     summary: '',
     imagePath: '',
     content: '',
-    sortOrder: findMinAvailableSortOrder()
+    sortOrder: findMinAvailableSortOrder(),
+    tenantId:1
   }
   dialogKey.value++
   dialogVisible.value = true
@@ -224,15 +246,12 @@ function handleExport() {
 
 async function handleSave(news: NewsItem) {
   try {
-    if (news.sortOrder == null) {
-      news.sortOrder = 0
-    }
 
     if (isEdit.value) {
       await axios.put(`http://localhost:8080/api/news/${news.id}`, news)
       ElMessage.success('修改成功')
     } else {
-      await axios.post('http://localhost:8080/api/news', news)
+      await axios.post(`http://localhost:8080/api/news?role=${role}`, news)
       ElMessage.success('新增成功')
     }
 
@@ -290,10 +309,24 @@ function handleCancel() {
     <!-- 操作按钮 -->
     <div class="mb-4 mt-2 flex gap-3">
       <el-button type="primary" @click="handleAdd">新增</el-button>
-      <el-button type="success" @click="handleEdit">修改</el-button>
-      <el-button type="danger" @click="batchDelete">删除</el-button>
+      <el-button v-if="role === 'ADMIN'" type="success" @click="handleEdit">修改</el-button>
+      <el-button v-if="role === 'ADMIN'" type="danger" @click="batchDelete">删除</el-button>
       <el-button type="warning" @click="handleExport">导出</el-button>
       <el-button type="primary" @click="openRecycleBin">查看回收站</el-button>
+      <el-button
+          v-if="role === 'ADMIN'"
+          type="warning"
+          @click="openAuditDialog"
+      >
+        审核新闻资讯
+      </el-button>
+      <el-button
+          v-else
+          type="info"
+          @click="openAuditStatusDialog"
+      >
+        查看审核状态
+      </el-button>
     </div>
 
     <!-- 表格 -->
@@ -303,19 +336,19 @@ function handleCancel() {
         border
         stripe
         style="width: 100%"
-        highlight-current-row
+        :highlight-current-row="role === 'ADMIN'"
         :current-row-key="currentRowKey"
-        @row-click="handleRowClick"
+        @row-click="role === 'ADMIN' ? handleRowClick : null"
         @selection-change="handleSelectionChange"
     >
-      <el-table-column type="selection" width="55" />
+      <el-table-column v-if="role === 'ADMIN'" type="selection" width="55" />
       <el-table-column prop="title" label="新闻标题" />
       <el-table-column prop="author" label="作者" />
       <el-table-column prop="summary" label="新闻简介" />
-      <el-table-column label="操作" width="160">
+      <el-table-column v-if="role === 'ADMIN'" label="操作" width="160">
         <template #default="scope">
-          <el-button type="text" size="small" @click.stop="editRow(scope.row)">修改</el-button>
-          <el-button type="text" size="small" style="color: red" @click.stop="deleteRow(scope.row)">删除</el-button>
+          <el-button v-if="role === 'ADMIN'" type="text" size="small" @click.stop="editRow(scope.row)">修改</el-button>
+          <el-button v-if="role === 'ADMIN'" type="text" size="small" style="color: red" @click.stop="deleteRow(scope.row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -331,11 +364,21 @@ function handleCancel() {
           @current-change="handlePageChange"
       />
     </div>
+    <AuditStatusDialog
+        v-model="auditStatusDialogVisible"
+        :tenant-id="form.tenantId"
+        @reloaded="loadNews"
+    />
+    <AuditDialog
+        v-model="auditDialogVisible"
+        @reloaded="onAuditReloaded"
+    />
 
     <NewsDialog
         :key="dialogKey"
         v-model:visible="dialogVisible"
         :isEdit="isEdit"
+        :isAdmin="role === 'ADMIN'"
         :modelValue="form"
         :maxSortOrder="maxSortOrder"
         @save="handleSave"
@@ -343,6 +386,8 @@ function handleCancel() {
     />
     <RecycleBin
         v-model="recycleBinVisible"
+        :tenant-id="form.tenantId"
+        :role="role"
         @reloaded="loadNews"
     />
   </div>

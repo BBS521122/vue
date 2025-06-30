@@ -12,7 +12,7 @@ const dialogKey = ref(0)
 const recycleBinVisible = ref(false)
 const tableRef = ref<any>(null)
 const currentRowKey = ref<number | null>(null)
-const role = 'ADMIN'
+const role = 'user'
 const auditDialogVisible = ref(false)
 const auditStatusDialogVisible = ref(false)
 function openAuditDialog() {
@@ -368,6 +368,7 @@ function handleCancel() {
         v-model="auditStatusDialogVisible"
         :tenant-id="form.tenantId"
         @reloaded="loadNews"
+        @edit-news="editRow"
     />
     <AuditDialog
         v-model="auditDialogVisible"

@@ -56,17 +56,6 @@
         style="margin-top: 12px; text-align: right"
     />
 
-    <!-- 编辑弹窗 -->
-    <NewsDialog
-        :key="dialogKey"
-        v-model:visible="dialogVisible"
-        :isEdit="true"
-        :isAdmin="false"
-        :modelValue="form"
-        :maxSortOrder="maxSortOrder"
-        @save="handleSave"
-        @cancel="handleCancel"
-    />
   </el-dialog>
 </template>
 
@@ -74,7 +63,6 @@
 import { ref, watch, nextTick, computed } from 'vue'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import NewsDialog from './NewsDialog.vue'
 
 interface NewsItem {
   id: number
@@ -95,16 +83,13 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:modelValue', val: boolean): void
   (e: 'reloaded'): void
+  (e: 'edit-news', news: NewsItem): void
 }>()
 
 
 const visible = ref(false)
 const newsList = ref<NewsItem[]>([])
 
-const dialogVisible = ref(false)
-const dialogKey = ref(0)
-const form = ref<NewsItem | any>({})
-const maxSortOrder = ref(100) // 默认最大排序值，建议从后台获取
 
 // 搜索和分页状态
 const searchTitle = ref('')
@@ -154,15 +139,12 @@ function handlePageChange(page: number) {
   currentPage.value = page
 }
 
-async function editRow(row: NewsItem) {
-  dialogVisible.value = false
-  await nextTick()
-  form.value = { ...row }
-  dialogKey.value++
-  dialogVisible.value = true
+function editRow(row: NewsItem) {
+  emit('edit-news', { ...row })
 }
 
-async function deleteRow(row: NewsItem) {
+
+function deleteRow(row: NewsItem) {
   ElMessageBox.confirm(`确认删除资讯：${row.title}？`, '提示')
       .then(async () => {
         await axios.delete(`http://localhost:8080/api/news/${row.id}`)
@@ -173,34 +155,9 @@ async function deleteRow(row: NewsItem) {
       .catch(() => {
         ElMessage.info('取消删除')
       })
-
 }
 
-async function handleSave(news: NewsItem) {
-  try {
-    // 只支持修改，必须有 id
-    if (!news.id) {
-      ElMessage.error('无效的新闻ID，无法修改')
-      return
-    }
 
-    // 调用后端接口更新新闻
-    await axios.put(`http://localhost:8080/api/news/${news.id}`, news)
-
-    ElMessage.success('资讯修改成功')
-    dialogVisible.value = false
-    await loadMyNews() // 重新加载列表数据
-    emit('reloaded')
-
-  } catch (error) {
-    console.error(error)
-    ElMessage.error('资讯修改失败')
-  }
-}
-
-function handleCancel() {
-  dialogVisible.value = false
-}
 
 </script>
 

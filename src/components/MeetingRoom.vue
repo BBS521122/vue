@@ -15,6 +15,23 @@
         暂无视频流信息
       </div>
     </div>
+    <!-- 辅助视频 -->
+    <div v-if="secondaryVideoStream" class="secondary-video">
+      <video
+          ref="secondaryVideoRef"
+          :srcObject="secondaryVideoStream"
+          autoplay
+          muted
+          class="secondary-video-element"
+          @click="switchMainVideo"
+      ></video>
+      <div class="switch-button" @click="switchMainVideo">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+          <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7z"/>
+          <path d="M17 17H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/>
+        </svg>
+      </div>
+    </div>
 
     <!-- 弹幕区域 -->
     <div class="chat-area">
@@ -198,9 +215,10 @@ export default {
         isCreator: isCreator.value,
         serverUrl: props.serverUrl
       };
-      // 根据id获取会议信息
-
+      // TODO 根据id获取会议信息
+      console.log("会议ID:", config.roomId);
       await mediaSoupClient.connect(config);
+      await mediaSoupClient.handleCreatorVideo();
 
       // 如果是创建者，自动开启摄像头
       if (isCreator.value) {
@@ -210,22 +228,80 @@ export default {
 
     // 处理新消费者
     function handleNewConsumer(consumer, peerId) {
-      console.log('新消费者:', peerId);
+      console.log('=== 处理新消费者 ===');
+      console.log('消费者信息:', {
+        id: consumer.id,
+        kind: consumer.kind,
+        appData: consumer.appData,
+        track: !!consumer.track,
+        trackId: consumer.track?.id,
+        trackEnabled: consumer.track?.enabled,
+        trackReadyState: consumer.track?.readyState
+      });
+      console.log('来自用户:', peerId);
+      
       const stream = new MediaStream([consumer.track]);
+      console.log('创建的视频流:', {
+        id: stream.id,
+        active: stream.active,
+        trackCount: stream.getTracks().length,
+        videoTracks: stream.getVideoTracks().length,
+        audioTracks: stream.getAudioTracks().length
+      });
 
-      if (consumer.appData?.type === 'camera') {
+      console.log('当前主视频流状态:', {
+        hasMainVideo: !!mainVideoStream.value,
+        mainVideoId: mainVideoStream.value?.id
+      });
+
+      // 兼容 creator-video 类型
+      if (consumer.appData?.type === 'camera' || consumer.appData?.type === 'creator-video') {
+        console.log('🎥 识别为摄像头或创建者视频流');
         if (!mainVideoStream.value) {
+          console.log('📺 设置为主视频流');
           mainVideoStream.value = stream;
+          console.log('✅ 主视频流已设置:', {
+            streamId: stream.id,
+            active: stream.active
+          });
         } else {
+          console.log('📹 设置为辅助视频流');
           secondaryVideoStream.value = stream;
+          console.log('✅ 辅助视频流已设置:', {
+            streamId: stream.id,
+            active: stream.active
+          });
         }
       } else if (consumer.appData?.type === 'screen') {
+        console.log('🖥️ 识别为屏幕共享流');
         // 屏幕共享优先显示在主视频
         if (mainVideoStream.value && mainVideoStream.value !== stream) {
+          console.log('📹 原主视频流移至辅助位置');
           secondaryVideoStream.value = mainVideoStream.value;
         }
+        console.log('📺 屏幕共享设为主视频流');
         mainVideoStream.value = stream;
+        console.log('✅ 屏幕共享主视频流已设置:', {
+          streamId: stream.id,
+          active: stream.active
+        });
+      } else {
+        console.warn('⚠️ 未知的流类型:', consumer.appData?.type);
       }
+
+      console.log('=== 处理完成后的状态 ===');
+      console.log('主视频流:', {
+        exists: !!mainVideoStream.value,
+        id: mainVideoStream.value?.id,
+        active: mainVideoStream.value?.active,
+        trackCount: mainVideoStream.value?.getTracks().length
+      });
+      console.log('辅助视频流:', {
+        exists: !!secondaryVideoStream.value,
+        id: secondaryVideoStream.value?.id,
+        active: secondaryVideoStream.value?.active,
+        trackCount: secondaryVideoStream.value?.getTracks().length
+      });
     }
 
     // 处理消费者关闭

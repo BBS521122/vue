@@ -87,6 +87,19 @@ export class MediaSoupClientService {
             // 建立WebSocket连接
             await this.connectWebSocket();
 
+            // 等待 connected 消消息，拿到 peerId 后再创建传输
+            await new Promise<void>((resolve) => {
+                const originalHandler = this.handleWebSocketMessage.bind(this);
+                this.handleWebSocketMessage = async (data: any) => {
+                    await originalHandler(data);
+                    if (data.type === 'connected') {
+                        resolve();
+                        // 恢复原有 handler
+                        this.handleWebSocketMessage = originalHandler;
+                    }
+                };
+            });
+
             // 创建传输
             await this.createTransports();
 
@@ -133,40 +146,83 @@ export class MediaSoupClientService {
 
     // 处理WebSocket消息
     private async handleWebSocketMessage(data: any) {
+        console.log('=== 处理WebSocket消息 ===');
+        console.log('消息类型:', data.type);
+        console.log('完整消息:', data);
+        
         switch (data.type) {
             case 'connected':
                 this.peerId = data.peerId;
+                console.log('✅ 连接确认，peerId:', this.peerId);
                 break;
             case 'roomJoined':
-                console.log('成功加入房间');
+                console.log('✅ 成功加入房间');
                 break;
             case 'userJoined':
+                console.log('👤 用户加入:', data.peerId, '是否创建者:', data.isCreator);
                 this.onUserJoined?.(data.peerId, data.isCreator);
                 break;
             case 'userLeft':
+                console.log('👤 用户离开:', data.peerId);
                 this.onUserLeft?.(data.peerId);
                 break;
             case 'newMessage':
+                console.log('💬 新消息:', data.message);
                 this.onNewMessage?.(data.message);
                 break;
             case 'recordingStarted':
+                console.log('🔴 录制开始:', data);
                 this.onRecordingStarted?.(data);
                 break;
             case 'recordingStopped':
+                console.log('⏹️ 录制停止:', data);
                 this.onRecordingStopped?.(data);
                 break;
             case 'muteStatusChanged':
+                console.log('🔇 禁言状态变化:', data.muteAll);
                 this.onMuteStatusChanged?.(data.muteAll);
                 break;
             case 'mainVideoChanged':
+                console.log('📺 主视频变化:', data.producerId);
                 this.onMainVideoChanged?.(data.producerId);
                 break;
             case 'newProducer':
-                await this.consume(data.producerId, data.peerId);
+                console.log('🎬 新生产者:', {
+                    producerId: data.producerId,
+                    peerId: data.peerId,
+                    appData: data.appData,
+                    kind: data.kind
+                });
+                if (data.appData?.type === 'creator-video') {
+                    console.log('🎯 这是创建者视频流，准备订阅...');
+                    try {
+                        await this.consume(data.producerId, data.peerId);
+                        console.log('✅ 创建者视频流订阅成功');
+                    } catch (error) {
+                        console.error('❌ 创建者视频流订阅失败:', error);
+                    }
+                } else if (data.appData?.type === 'screen') {
+                    // 新增：非创建者自动订阅屏幕共享流
+                    if (!this.isCreator) {
+                        console.log('🖥️ 检测到屏幕共享流，非创建者自动订阅...');
+                        try {
+                            await this.consume(data.producerId, data.peerId);
+                            console.log('✅ 屏幕共享流订阅成功');
+                        } catch (error) {
+                            console.error('❌ 屏幕共享流订阅失败:', error);
+                        }
+                    } else {
+                        console.log('ℹ️ 创建者收到屏幕共享流，跳过订阅');
+                    }
+                } else {
+                    console.log('ℹ️ 非创建者视频流，跳过订阅');
+                }
                 break;
             case 'error':
-                console.error('服务器错误:', data.message);
+                console.error('❌ 服务器错误:', data.message);
                 break;
+            default:
+                console.warn('⚠️ 未知消息类型:', data.type);
         }
     }
 
@@ -179,13 +235,23 @@ export class MediaSoupClientService {
 
     // 创建传输
     private async createTransports() {
+        console.log('=== 创建传输开始 ===');
+        console.log('peerId:', this.peerId);
+        
         // 创建发送传输
         const sendTransportResponse = await fetch(`${this.serverUrl}/api/createWebRtcTransport`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({producing: true, consuming: false})
+            body: JSON.stringify({producing: true, consuming: false, peerId: this.peerId})
         });
         const sendTransportData = await sendTransportResponse.json();
+
+        console.log('✅ 发送传输数据:', {
+            id: sendTransportData.id,
+            iceParametersKeys: Object.keys(sendTransportData.iceParameters || {}),
+            iceCandidatesCount: sendTransportData.iceCandidates?.length || 0,
+            dtlsParametersKeys: Object.keys(sendTransportData.dtlsParameters || {})
+        });
 
         this.sendTransport = this.device!.createSendTransport({
             id: sendTransportData.id,
@@ -198,6 +264,7 @@ export class MediaSoupClientService {
             dtlsParameters: any
         }, callback: () => void, errback: (error: any) => void) => {
             try {
+                console.log('📡 连接发送传输...');
                 await fetch(`${this.serverUrl}/api/connectTransport`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
@@ -206,8 +273,10 @@ export class MediaSoupClientService {
                         dtlsParameters
                     })
                 });
+                console.log('✅ 发送传输连接成功');
                 callback();
             } catch (error) {
+                console.error('❌ 发送传输连接失败:', error);
                 errback(error);
             }
         });
@@ -219,6 +288,7 @@ export class MediaSoupClientService {
             appData: any
         }, callback: (data: { id: string }) => void, errback: (error: any) => void) => {
             try {
+                console.log('🎬 开始生产媒体流:', { kind, appData });
                 const response = await fetch(`${this.serverUrl}/api/produce`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
@@ -230,8 +300,10 @@ export class MediaSoupClientService {
                     })
                 });
                 const {id} = await response.json();
+                console.log('✅ 生产者创建成功，ID:', id);
                 callback({id});
             } catch (error) {
+                console.error('❌ 生产者创建失败:', error);
                 errback(error);
             }
         });
@@ -240,9 +312,16 @@ export class MediaSoupClientService {
         const recvTransportResponse = await fetch(`${this.serverUrl}/api/createWebRtcTransport`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({producing: false, consuming: true})
+            body: JSON.stringify({producing: false, consuming: true, peerId: this.peerId})
         });
         const recvTransportData = await recvTransportResponse.json();
+
+        console.log('✅ 接收传输数据:', {
+            id: recvTransportData.id,
+            iceParametersKeys: Object.keys(recvTransportData.iceParameters || {}),
+            iceCandidatesCount: recvTransportData.iceCandidates?.length || 0,
+            dtlsParametersKeys: Object.keys(recvTransportData.dtlsParameters || {})
+        });
 
         this.recvTransport = this.device!.createRecvTransport({
             id: recvTransportData.id,
@@ -255,6 +334,7 @@ export class MediaSoupClientService {
             dtlsParameters: any
         }, callback: () => void, errback: (error: any) => void) => {
             try {
+                console.log('📡 连接接收传输...');
                 await fetch(`${this.serverUrl}/api/connectTransport`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
@@ -263,37 +343,62 @@ export class MediaSoupClientService {
                         dtlsParameters
                     })
                 });
+                console.log('✅ 接收传输连接成功');
                 callback();
             } catch (error) {
+                console.error('❌ 接收传输连接失败:', error);
                 errback(error);
             }
         });
+        
+        console.log('=== 传输创建完成 ===');
     }
 
     // 开始生产媒体流
     async produce(track: MediaStreamTrack, appData: any = {}) {
+        console.log('=== 开始创建生产者 ===');
+        console.log('track kind:', track.kind);
+        console.log('track enabled:', track.enabled);
+        console.log('track readyState:', track.readyState);
+        console.log('appData:', appData);
+        
         if (!this.sendTransport) {
             throw new Error('发送传输未初始化');
         }
-
+        
         const producer = await this.sendTransport.produce({
             track,
             appData
         });
-
+        
+        console.log('✅ 生产者创建成功:', {
+            id: producer.id,
+            kind: producer.kind,
+            paused: producer.paused,
+            appData: producer.appData
+        });
+        
         this.producers.set(producer.id, producer);
         return producer;
     }
 
     // 消费媒体流
     async consume(producerId: string, peerId: string) {
+        console.log('=== 开始订阅生产者 ===');
+        console.log('producerId:', producerId);
+        console.log('peerId:', peerId);
+        console.log('recvTransport ID:', this.recvTransport?.id);
+        console.log('device loaded:', this.device?.loaded);
+        
         if (!this.recvTransport || !this.device) {
+            console.error('❌ 接收传输或设备未初始化');
             throw new Error('接收传输或设备未初始化');
         }
 
+        console.log('📡 发送消费请求...');
         const response = await fetch(`${this.serverUrl}/api/consume`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 transportId: this.recvTransport.id,
                 producerId,
@@ -302,23 +407,44 @@ export class MediaSoupClientService {
         });
 
         const consumerData = await response.json();
+        console.log('✅ 消费者数据响应:', {
+            id: consumerData.id,
+            producerId: consumerData.producerId,
+            kind: consumerData.kind,
+            rtpParametersKeys: Object.keys(consumerData.rtpParameters || {}),
+            appData: consumerData.appData // 🔥 关键：记录 appData
+        });
 
+        console.log('🔄 创建本地消费者...');
         const consumer = await this.recvTransport.consume({
             id: consumerData.id,
             producerId: consumerData.producerId,
             kind: consumerData.kind,
-            rtpParameters: consumerData.rtpParameters
+            rtpParameters: consumerData.rtpParameters,
+            appData: consumerData.appData || {} // 🔥 关键修复：将 appData 传递给 consumer
+        });
+        
+        console.log('✅ 消费者创建成功:', {
+            id: consumer.id,
+            kind: consumer.kind,
+            paused: consumer.paused,
+            track: !!consumer.track,
+            trackId: consumer.track?.id,
+            trackEnabled: consumer.track?.enabled,
+            trackReadyState: consumer.track?.readyState,
+            appData: consumer.appData // 🔥 关键：验证 appData 是否正确设置
         });
 
         this.consumers.set(consumer.id, consumer);
 
-        // 恢复消费者
+        console.log('📡 恢复消费者...');
         await fetch(`${this.serverUrl}/api/resumeConsumer`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({consumerId: consumer.id})
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ consumerId: consumer.id })
         });
 
+        console.log('✅ 消费者恢复完成，调用回调...');
         this.onNewConsumer?.(consumer, peerId);
         return consumer;
     }
@@ -339,6 +465,75 @@ export class MediaSoupClientService {
             type: 'muteUser',
             mute
         });
+    }
+
+    /**
+     * 创建者视频流：创建者发布视频流，非创建者订阅视频流
+     * @date 2025-7-1 20:44
+     */
+    async handleCreatorVideo() {
+        console.log('=== 处理创建者视频流 ===');
+        console.log('isCreator:', this.isCreator);
+        console.log('peerId:', this.peerId);
+        
+        if (this.isCreator) {
+            console.log('👑 创建者模式：上传视频流');
+            try {
+                const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const videoTrack = videoStream.getVideoTracks()[0];
+                
+                console.log('📹 获取视频流成功:', {
+                    trackId: videoTrack.id,
+                    kind: videoTrack.kind,
+                    enabled: videoTrack.enabled,
+                    readyState: videoTrack.readyState,
+                    label: videoTrack.label
+                });
+                
+                await this.produce(videoTrack, { type: 'creator-video' });
+                console.log('✅ 创建者视频流发布完成');
+            } catch (error) {
+                console.error('❌ 创建者视频流处理失败:', error);
+                throw error;
+            }
+        } else {
+            console.log('👥 非创建者模式：订阅创建者视频流');
+            if (this.ws) {
+                console.log('✅ WebSocket已连接，设置消息监听器');
+                // 保存原来的onmessage，避免覆盖
+                const originalOnMessage = this.ws.onmessage;
+                
+                this.ws.onmessage = async (event) => {
+                    const data = JSON.parse(event.data);
+                    console.log('📨 非创建者接收到消息:', {
+                        type: data.type,
+                        data: data
+                    });
+                    
+                    // 调用原来的消息处理器
+                    if (originalOnMessage && this.ws) {
+                        originalOnMessage.call(this.ws, event);
+                    }
+                    
+                    // 额外处理newProducer消息
+                    if (data.type === 'newProducer' && data.appData?.type === 'creator-video') {
+                        console.log('🎬 发现创建者视频生产者:', {
+                            producerId: data.producerId,
+                            peerId: data.peerId,
+                            appData: data.appData
+                        });
+                        try {
+                            await this.consume(data.producerId, data.peerId);
+                            console.log('✅ 成功订阅创建者视频流');
+                        } catch (error) {
+                            console.error('❌ 订阅创建者视频流失败:', error);
+                        }
+                    }
+                };
+            } else {
+                console.error('❌ WebSocket 未初始化');
+            }
+        }
     }
 
     // 切换主视频

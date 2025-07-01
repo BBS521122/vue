@@ -7,21 +7,14 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/login'
+      redirect: '/meeting/creator/1',
     },
     {
-      path: '/login',
-      name: 'login',
-      component: () => import('../views/Login.vue'),
-    },
-    {
-      path: '/about',
-      name: 'about',
-      // route level code-splitting
-      // this generates a separate chunk (About.[hash].js) for this route
-      // which is lazy-loaded when the route is visited.
-      component: () => import('../views/AboutView.vue'),
-    },
+      path: '/meeting/:role(user|creator)/:id',
+      name: 'MeetingRole',
+      component: () => import('../components/MeetingRoom.vue'),
+      props: true
+    }
   ],
 })
 

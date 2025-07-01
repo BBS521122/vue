@@ -16,6 +16,7 @@
     "@wangeditor/editor-for-vue": "^5.1.12",
     "axios": "^1.10.0",
     "element-plus": "^2.10.2",
+    "mediasoup-client": "^3.12.2",
     "pinia": "^3.0.1",
     "uuid": "^11.1.0",
     "vue": "^3.5.13",

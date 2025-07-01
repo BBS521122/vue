@@ -10,26 +10,33 @@
             muted
             class="main-video-element"
         ></video>
+        <!-- 辅助视频移到主视频内部右上角 -->
+        <div v-if="secondaryVideoStream" class="secondary-video-inside">
+          <video
+              ref="secondaryVideoRef"
+              :srcObject="secondaryVideoStream"
+              autoplay
+              muted
+              class="secondary-video-element"
+              @click="isCreator ? switchMainVideo : null"
+          ></video>
+          <div 
+              v-if="isCreator" 
+              class="switch-button" 
+              @click="switchMainVideo"
+              title="切换主辅视频"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+            </svg>
+          </div>
+          <div v-else class="viewer-indicator" title="观看者模式">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="white" opacity="0.6">
+            </svg>
+          </div>
+        </div>
       </div>
       <div v-else class="no-video">
         暂无视频流信息
-      </div>
-    </div>
-    <!-- 辅助视频 -->
-    <div v-if="secondaryVideoStream" class="secondary-video">
-      <video
-          ref="secondaryVideoRef"
-          :srcObject="secondaryVideoStream"
-          autoplay
-          muted
-          class="secondary-video-element"
-          @click="switchMainVideo"
-      ></video>
-      <div class="switch-button" @click="switchMainVideo">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-          <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7z"/>
-          <path d="M17 17H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/>
-        </svg>
       </div>
     </div>
 
@@ -132,7 +139,7 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, reactive, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import MediaSoupClientService from '../MediaSoupClient.js';
 
 export default {
@@ -224,6 +231,10 @@ export default {
       if (isCreator.value) {
         await toggleCamera();
       }
+      
+      // 确保所有视频流都正确绑定
+      await nextTick();
+      bindVideoStreams();
     }
 
     // 处理新消费者
@@ -302,6 +313,11 @@ export default {
         active: secondaryVideoStream.value?.active,
         trackCount: secondaryVideoStream.value?.getTracks().length
       });
+      
+      // 确保视频流正确绑定到DOM
+      nextTick(() => {
+        bindVideoStreams();
+      });
     }
 
     // 处理消费者关闭
@@ -346,9 +362,53 @@ export default {
       isMuteAll.value = muteAll;
     }
 
-    // 处理主视频变化
-    function handleMainVideoChanged(producerId) {
-      console.log('主视频变化:', producerId);
+    // 处理主视频变化（接收来自创建者的切换通知）
+    function handleMainVideoChanged(data) {
+      console.log('=== 接收到主视频切换通知 ===');
+      console.log('切换数据:', data);
+      
+      if (isCreator.value) {
+        console.log('👑 创建者忽略自己发送的切换通知');
+        return;
+      }
+      
+      console.log('👥 非创建者执行主辅视频切换同步');
+      console.log('同步前 - 主视频:', mainVideoStream.value?.id);
+      console.log('同步前 - 辅助视频:', secondaryVideoStream.value?.id);
+      
+      // 如果数据包含具体的流ID，则按照指定同步
+      if (data.mainStreamId && data.secondaryStreamId) {
+        // 查找对应的流对象
+        const streams = [mainVideoStream.value, secondaryVideoStream.value].filter(Boolean);
+        const newMainStream = streams.find(stream => stream.id === data.mainStreamId);
+        const newSecondaryStream = streams.find(stream => stream.id === data.secondaryStreamId);
+        
+        if (newMainStream && newSecondaryStream) {
+          mainVideoStream.value = newMainStream;
+          secondaryVideoStream.value = newSecondaryStream;
+          console.log('✅ 按流ID同步完成');
+        } else {
+          console.log('⚠️ 未找到对应的流，执行简单切换');
+          // 如果找不到对应流，则执行简单的位置切换
+          if (secondaryVideoStream.value) {
+            const temp = mainVideoStream.value;
+            mainVideoStream.value = secondaryVideoStream.value;
+            secondaryVideoStream.value = temp;
+          }
+        }
+      } else {
+        // 兼容旧的切换方式，简单的位置切换
+        console.log('📱 执行简单位置切换');
+        if (secondaryVideoStream.value) {
+          const temp = mainVideoStream.value;
+          mainVideoStream.value = secondaryVideoStream.value;
+          secondaryVideoStream.value = temp;
+        }
+      }
+      
+      console.log('同步后 - 主视频:', mainVideoStream.value?.id);
+      console.log('同步后 - 辅助视频:', secondaryVideoStream.value?.id);
+      console.log('✅ 主辅视频切换同步完成');
     }
 
     // 切换摄像头
@@ -357,18 +417,33 @@ export default {
         if (isCameraOn.value) {
           // 关闭摄像头
           if (cameraStream) {
-            cameraStream.getTracks().forEach(track => track.stop());
+            console.log('🛑 关闭摄像头');
+            
+            // 关闭MediaSoup生产者
+            if (mediaSoupClient) {
+              console.log('🔄 关闭摄像头生产者');
+              await mediaSoupClient.closeCameraProducers();
+            }
+            
+            // 停止媒体轨道
+            cameraStream.getTracks().forEach(track => {
+              console.log('⏹️ 停止轨道:', track.kind);
+              track.stop();
+            });
             cameraStream = null;
           }
           isCameraOn.value = false;
 
-          // 如果主视频是摄像头，切换到辅助视频
+          // 清空与摄像头相关的视频流引用
           if (mainVideoStream.value === cameraStream) {
             mainVideoStream.value = secondaryVideoStream.value;
+            secondaryVideoStream.value = null;
+          } else if (secondaryVideoStream.value === cameraStream) {
             secondaryVideoStream.value = null;
           }
         } else {
           // 开启摄像头
+          console.log('📹 开启摄像头');
           cameraStream = await navigator.mediaDevices.getUserMedia({
             video: true,
             audio: true
@@ -379,9 +454,11 @@ export default {
           const audioTrack = cameraStream.getAudioTracks()[0];
 
           if (videoTrack) {
+            console.log('📹 创建摄像头视频生产者');
             await mediaSoupClient.produce(videoTrack, { type: 'camera' });
           }
           if (audioTrack) {
+            console.log('🔊 创建音频生产者');
             await mediaSoupClient.produce(audioTrack, { type: 'audio' });
           }
 
@@ -393,6 +470,10 @@ export default {
           }
 
           isCameraOn.value = true;
+          
+          // 确保视频流正确绑定到DOM
+          await nextTick();
+          bindVideoStreams();
         }
       } catch (error) {
         console.error('切换摄像头失败:', error);
@@ -406,18 +487,33 @@ export default {
         if (isScreenSharing.value) {
           // 停止屏幕共享
           if (screenStream) {
-            screenStream.getTracks().forEach(track => track.stop());
+            console.log('🛑 停止屏幕共享');
+            
+            // 关闭MediaSoup生产者
+            if (mediaSoupClient) {
+              console.log('🔄 关闭屏幕共享生产者');
+              await mediaSoupClient.closeScreenProducers();
+            }
+            
+            // 停止媒体轨道
+            screenStream.getTracks().forEach(track => {
+              console.log('⏹️ 停止轨道:', track.kind);
+              track.stop();
+            });
             screenStream = null;
           }
           isScreenSharing.value = false;
 
-          // 恢复摄像头为主视频
-          if (cameraStream) {
-            mainVideoStream.value = cameraStream;
+          // 清空与屏幕共享相关的视频流引用
+          if (mainVideoStream.value === screenStream) {
+            mainVideoStream.value = secondaryVideoStream.value || cameraStream;
+            secondaryVideoStream.value = null;
+          } else if (secondaryVideoStream.value === screenStream) {
             secondaryVideoStream.value = null;
           }
         } else {
           // 开始屏幕共享
+          console.log('🎬 开始屏幕共享');
           screenStream = await navigator.mediaDevices.getDisplayMedia({
             video: true,
             audio: true
@@ -428,9 +524,11 @@ export default {
           const audioTrack = screenStream.getAudioTracks()[0];
 
           if (videoTrack) {
+            console.log('📹 创建屏幕视频生产者');
             await mediaSoupClient.produce(videoTrack, { type: 'screen' });
           }
           if (audioTrack) {
+            console.log('🔊 创建屏幕音频生产者');
             await mediaSoupClient.produce(audioTrack, { type: 'screen-audio' });
           }
 
@@ -441,9 +539,14 @@ export default {
           mainVideoStream.value = screenStream;
 
           isScreenSharing.value = true;
+          
+          // 确保视频流正确绑定到DOM
+          await nextTick();
+          bindVideoStreams();
 
           // 监听屏幕共享结束
           videoTrack.onended = () => {
+            console.log('📺 屏幕共享被用户结束');
             toggleScreenShare();
           };
         }
@@ -455,10 +558,33 @@ export default {
 
     // 切换主辅视频
     function switchMainVideo() {
+      if (!isCreator.value) {
+        console.log('⚠️ 非创建者无法切换主辅视频');
+        return;
+      }
+      
       if (secondaryVideoStream.value) {
+        console.log('=== 创建者切换主辅视频 ===');
+        console.log('切换前 - 主视频:', mainVideoStream.value?.id);
+        console.log('切换前 - 辅助视频:', secondaryVideoStream.value?.id);
+        
         const temp = mainVideoStream.value;
         mainVideoStream.value = secondaryVideoStream.value;
         secondaryVideoStream.value = temp;
+        
+        console.log('切换后 - 主视频:', mainVideoStream.value?.id);
+        console.log('切换后 - 辅助视频:', secondaryVideoStream.value?.id);
+        
+        // 通知服务器和其他用户进行同步切换
+        if (mediaSoupClient) {
+          // 这里我们通过WebSocket发送切换通知，而不是使用producerId
+          // 因为我们要同步的是视频流的布局，而不是特定的producer
+          mediaSoupClient.switchMainVideo({
+            mainStreamId: mainVideoStream.value?.id,
+            secondaryStreamId: secondaryVideoStream.value?.id
+          });
+          console.log('📤 已发送主辅视频切换通知到服务器');
+        }
       }
     }
 
@@ -520,6 +646,44 @@ export default {
       });
     }
 
+    // 手动绑定视频流到DOM元素
+    function bindVideoStreams() {
+      console.log('🔗 手动绑定视频流到DOM元素');
+      
+      if (mainVideoRef.value && mainVideoStream.value) {
+        console.log('🎬 绑定主视频流:', mainVideoStream.value.id);
+        mainVideoRef.value.srcObject = mainVideoStream.value;
+        mainVideoRef.value.play().catch(e => console.warn('主视频播放失败:', e));
+      }
+      
+      if (secondaryVideoRef.value && secondaryVideoStream.value) {
+        console.log('🎬 绑定辅助视频流:', secondaryVideoStream.value.id);
+        secondaryVideoRef.value.srcObject = secondaryVideoStream.value;
+        secondaryVideoRef.value.play().catch(e => console.warn('辅助视频播放失败:', e));
+      }
+    }
+
+    // 监听视频流变化，确保正确绑定到video元素
+    watch(mainVideoStream, async (newStream) => {
+      console.log('📺 主视频流变化:', newStream?.id);
+      await nextTick(); // 确保DOM更新完成
+      if (mainVideoRef.value && newStream) {
+        console.log('🔄 更新主视频元素的srcObject');
+        mainVideoRef.value.srcObject = newStream;
+        mainVideoRef.value.play().catch(e => console.warn('主视频自动播放失败:', e));
+      }
+    });
+
+    watch(secondaryVideoStream, async (newStream) => {
+      console.log('📺 辅助视频流变化:', newStream?.id);
+      await nextTick(); // 确保DOM更新完成
+      if (secondaryVideoRef.value && newStream) {
+        console.log('🔄 更新辅助视频元素的srcObject');
+        secondaryVideoRef.value.srcObject = newStream;
+        secondaryVideoRef.value.play().catch(e => console.warn('辅助视频自动播放失败:', e));
+      }
+    });
+
     return {
       mainVideoRef,
       secondaryVideoRef,
@@ -574,38 +738,8 @@ export default {
   object-fit: cover;
 }
 
-.video-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
-  padding: 20px;
-}
-
-.video-info {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.recording-indicator {
-  color: #ff4444;
-  font-weight: bold;
-  animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-.meeting-title {
-  font-size: 18px;
-  font-weight: bold;
-}
-
-.secondary-video {
+/* 新增：主视频内部右上角的辅视频 */
+.secondary-video-inside {
   position: absolute;
   top: 20px;
   right: 20px;
@@ -616,18 +750,18 @@ export default {
   overflow: hidden;
   cursor: pointer;
   transition: transform 0.2s;
+  z-index: 2;
+  background: #111;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
 }
-
-.secondary-video:hover {
+.secondary-video-inside:hover {
   transform: scale(1.05);
 }
-
 .secondary-video-element {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
-
 .switch-button {
   position: absolute;
   top: 8px;
@@ -642,9 +776,26 @@ export default {
   cursor: pointer;
   transition: background 0.2s;
 }
-
 .switch-button:hover {
   background: rgba(0,0,0,0.9);
+}
+.viewer-indicator {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0,0,0,0.5);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+/* 移除原有.secondary-video样式，避免外部定位 */
+.secondary-video {
+  display: none;
 }
 
 .chat-area {
@@ -851,17 +1002,14 @@ export default {
   .meeting-container {
     flex-direction: column;
   }
-
   .chat-area {
     width: 100%;
     height: 300px;
   }
-
   .control-bar {
     right: 0;
   }
-
-  .secondary-video {
+  .secondary-video-inside {
     width: 150px;
     height: 100px;
     top: 10px;

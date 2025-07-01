@@ -11,7 +11,7 @@
             class="main-video-element"
         ></video>
         <!-- 辅助视频移到主视频内部右上角 -->
-        <div v-if="secondaryVideoStream" class="secondary-video-inside">
+        <div v-if="shouldShowSecondaryVideo" class="secondary-video-inside">
           <video
               ref="secondaryVideoRef"
               :srcObject="secondaryVideoStream"
@@ -26,12 +26,10 @@
               @click="switchMainVideo"
               title="切换主辅视频"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-            </svg>
+            <img src="@/assets/icons/cached.svg" width="20" height="20" alt="切换主辅视频" />
           </div>
           <div v-else class="viewer-indicator" title="观看者模式">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="white" opacity="0.6">
-            </svg>
+            <img src="@/assets/icons/visibility.svg" width="16" height="16" alt="观看者" style="opacity:0.6;" />
           </div>
         </div>
       </div>
@@ -139,7 +137,7 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted, onUnmounted, nextTick, watch } from 'vue';
+import { ref, reactive, onMounted, onUnmounted, nextTick, watch, computed } from 'vue';
 import MediaSoupClientService from '../MediaSoupClient.js';
 
 export default {
@@ -182,6 +180,12 @@ export default {
     let mediaSoupClient;
     let cameraStream = null;
     let screenStream = null;
+
+    // 计算属性：是否应该显示辅助视频
+    const shouldShowSecondaryVideo = computed(() => {
+      // 只有当摄像头和屏幕共享同时存在时才显示辅助视频
+      return isCameraOn.value && isScreenSharing.value && secondaryVideoStream.value;
+    });
 
     // 初始化
     onMounted(async () => {
@@ -268,34 +272,36 @@ export default {
       // 兼容 creator-video 类型
       if (consumer.appData?.type === 'camera' || consumer.appData?.type === 'creator-video') {
         console.log('🎥 识别为摄像头或创建者视频流');
-        if (!mainVideoStream.value) {
-          console.log('📺 设置为主视频流');
+        cameraStream = stream; // 保存摄像头流引用
+        
+        // 如果没有屏幕共享，摄像头设为主视频
+        if (!isScreenSharing.value) {
+          console.log('📺 摄像头设置为主视频流（无屏幕共享）');
           mainVideoStream.value = stream;
-          console.log('✅ 主视频流已设置:', {
-            streamId: stream.id,
-            active: stream.active
-          });
+          secondaryVideoStream.value = null;
         } else {
-          console.log('📹 设置为辅助视频流');
+          // 如果有屏幕共享，摄像头设为辅助视频
+          console.log('📹 摄像头设置为辅助视频流（有屏幕共享）');
           secondaryVideoStream.value = stream;
-          console.log('✅ 辅助视频流已设置:', {
-            streamId: stream.id,
-            active: stream.active
-          });
         }
+        isCameraOn.value = true;
+        
       } else if (consumer.appData?.type === 'screen') {
         console.log('🖥️ 识别为屏幕共享流');
-        // 屏幕共享优先显示在主视频
-        if (mainVideoStream.value && mainVideoStream.value !== stream) {
-          console.log('📹 原主视频流移至辅助位置');
-          secondaryVideoStream.value = mainVideoStream.value;
-        }
+        screenStream = stream; // 保存屏幕共享流引用
+        
+        // 屏幕共享始终为主视频
         console.log('📺 屏幕共享设为主视频流');
         mainVideoStream.value = stream;
-        console.log('✅ 屏幕共享主视频流已设置:', {
-          streamId: stream.id,
-          active: stream.active
-        });
+        
+        // 如果有摄像头，设为辅助视频
+        if (isCameraOn.value && cameraStream) {
+          console.log('📹 摄像头移至辅助视频位置');
+          secondaryVideoStream.value = cameraStream;
+        } else {
+          secondaryVideoStream.value = null;
+        }
+        isScreenSharing.value = true;
       } else {
         console.warn('⚠️ 未知的流类型:', consumer.appData?.type);
       }
@@ -434,11 +440,16 @@ export default {
           }
           isCameraOn.value = false;
 
-          // 清空与摄像头相关的视频流引用
-          if (mainVideoStream.value === cameraStream) {
-            mainVideoStream.value = secondaryVideoStream.value;
+          // 重新分配视频流
+          if (isScreenSharing.value && screenStream) {
+            // 如果有屏幕共享，屏幕共享变为主视频，无辅助视频
+            console.log('📺 屏幕共享保持为主视频');
+            mainVideoStream.value = screenStream;
             secondaryVideoStream.value = null;
-          } else if (secondaryVideoStream.value === cameraStream) {
+          } else {
+            // 没有任何视频流
+            console.log('📺 清空所有视频流');
+            mainVideoStream.value = null;
             secondaryVideoStream.value = null;
           }
         } else {
@@ -463,9 +474,14 @@ export default {
           }
 
           // 设置本地视频流
-          if (!mainVideoStream.value) {
+          // 如果没有屏幕共享，摄像头设为主视频
+          if (!isScreenSharing.value) {
+            console.log('📺 摄像头设为主视频（无屏幕共享）');
             mainVideoStream.value = cameraStream;
+            secondaryVideoStream.value = null;
           } else {
+            // 如果有屏幕共享，摄像头设为辅助视频
+            console.log('📹 摄像头设为辅助视频（有屏幕共享）');
             secondaryVideoStream.value = cameraStream;
           }
 
@@ -504,11 +520,16 @@ export default {
           }
           isScreenSharing.value = false;
 
-          // 清空与屏幕共享相关的视频流引用
-          if (mainVideoStream.value === screenStream) {
-            mainVideoStream.value = secondaryVideoStream.value || cameraStream;
+          // 重新分配视频流
+          if (isCameraOn.value && cameraStream) {
+            // 如果有摄像头，摄像头变为主视频，无辅助视频
+            console.log('📺 摄像头变为主视频');
+            mainVideoStream.value = cameraStream;
             secondaryVideoStream.value = null;
-          } else if (secondaryVideoStream.value === screenStream) {
+          } else {
+            // 没有任何视频流
+            console.log('📺 清空所有视频流');
+            mainVideoStream.value = null;
             secondaryVideoStream.value = null;
           }
         } else {
@@ -533,10 +554,16 @@ export default {
           }
 
           // 设置屏幕共享为主视频
-          if (mainVideoStream.value) {
-            secondaryVideoStream.value = mainVideoStream.value;
-          }
+          console.log('📺 屏幕共享设为主视频');
           mainVideoStream.value = screenStream;
+          
+          // 如果有摄像头，设为辅助视频
+          if (isCameraOn.value && cameraStream) {
+            console.log('📹 摄像头设为辅助视频');
+            secondaryVideoStream.value = cameraStream;
+          } else {
+            secondaryVideoStream.value = null;
+          }
 
           isScreenSharing.value = true;
           
@@ -563,30 +590,33 @@ export default {
         return;
       }
       
-      if (secondaryVideoStream.value) {
-        console.log('=== 创建者切换主辅视频 ===');
-        console.log('切换前 - 主视频:', mainVideoStream.value?.id);
-        console.log('切换前 - 辅助视频:', secondaryVideoStream.value?.id);
-        
-        const temp = mainVideoStream.value;
-        mainVideoStream.value = secondaryVideoStream.value;
-        secondaryVideoStream.value = temp;
-        
-        console.log('切换后 - 主视频:', mainVideoStream.value?.id);
-        console.log('切换后 - 辅助视频:', secondaryVideoStream.value?.id);
-        
-        // 通知服务器和其他用户进行同步切换
-        if (mediaSoupClient) {
-          // 这里我们通过WebSocket发送切换通知，而不是使用producerId
-          // 因为我们要同步的是视频流的布局，而不是特定的producer
-          mediaSoupClient.switchMainVideo({
-            mainStreamId: mainVideoStream.value?.id,
-            secondaryStreamId: secondaryVideoStream.value?.id
-          });
-          console.log('📤 已发送主辅视频切换通知到服务器');
-        }
+      // 只有当同时有摄像头和屏幕共享时才能切换
+      if (!shouldShowSecondaryVideo.value) {
+        console.log('⚠️ 只有同时存在摄像头和屏幕共享才能切换主辅视频');
+        return;
       }
-    }
+      
+      console.log('=== 创建者切换主辅视频 ===');
+      console.log('切换前 - 主视频:', mainVideoStream.value?.id);
+      console.log('切换前 - 辅助视频:', secondaryVideoStream.value?.id);
+      
+      const temp = mainVideoStream.value;
+      mainVideoStream.value = secondaryVideoStream.value;
+      secondaryVideoStream.value = temp;
+      
+      console.log('切换后 - 主视频:', mainVideoStream.value?.id);
+      console.log('切换后 - 辅助视频:', secondaryVideoStream.value?.id);
+      
+      // 通知服务器和其他用户进行同步切换
+      if (mediaSoupClient) {
+        mediaSoupClient.switchMainVideo({
+          mainStreamId: mainVideoStream.value?.id,
+          secondaryStreamId: secondaryVideoStream.value?.id
+        });
+        console.log('📤 已发送主辅视频切换通知到服务器');
+      }
+      }
+
 
     // 发送消息
     function sendMessage() {
@@ -690,6 +720,7 @@ export default {
       chatMessagesRef,
       mainVideoStream,
       secondaryVideoStream,
+      shouldShowSecondaryVideo,
       isCameraOn,
       isScreenSharing,
       isRecording,

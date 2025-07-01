@@ -183,8 +183,8 @@ export class MediaSoupClientService {
                 this.onMuteStatusChanged?.(data.muteAll);
                 break;
             case 'mainVideoChanged':
-                console.log('📺 主视频变化:', data.producerId);
-                this.onMainVideoChanged?.(data.producerId);
+                console.log('📺 主视频变化:', data);
+                this.onMainVideoChanged?.(data);
                 break;
             case 'newProducer':
                 console.log('🎬 新生产者:', {
@@ -227,9 +227,12 @@ export class MediaSoupClientService {
     }
 
     // 发送WebSocket消息
-    private sendWebSocketMessage(message: any) {
+    sendWebSocketMessage(message: any) {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            console.log('📤 发送WebSocket消息:', message);
             this.ws.send(JSON.stringify(message));
+        } else {
+            console.warn('⚠️ WebSocket连接不可用，无法发送消息:', message);
         }
     }
 
@@ -537,12 +540,16 @@ export class MediaSoupClientService {
     }
 
     // 切换主视频
-    switchMainVideo(producerId: string) {
-        if (!this.isCreator) return;
+    switchMainVideo(data: { mainStreamId?: string, secondaryStreamId?: string, producerId?: string }) {
+        if (!this.isCreator) {
+            console.log('⚠️ 非创建者无法切换主视频');
+            return;
+        }
 
+        console.log('📺 创建者发送主视频切换请求:', data);
         this.sendWebSocketMessage({
             type: 'switchMainVideo',
-            producerId
+            ...data
         });
     }
 
@@ -585,6 +592,62 @@ export class MediaSoupClientService {
         }
 
         console.log('已断开会议连接');
+    }
+
+    // 关闭屏幕共享生产者
+    async closeScreenProducers() {
+        console.log('=== 关闭屏幕共享生产者 ===');
+        const screenProducers = [];
+        
+        for (const [producerId, producer] of this.producers) {
+            if (producer.appData?.type === 'screen' || producer.appData?.type === 'screen-audio') {
+                console.log('🔄 找到屏幕共享生产者:', {
+                    id: producerId,
+                    kind: producer.kind,
+                    type: producer.appData?.type
+                });
+                screenProducers.push(producerId);
+            }
+        }
+        
+        for (const producerId of screenProducers) {
+            const producer = this.producers.get(producerId);
+            if (producer) {
+                console.log('⏹️ 关闭生产者:', producerId);
+                producer.close();
+                this.producers.delete(producerId);
+            }
+        }
+        
+        console.log('✅ 屏幕共享生产者已关闭，剩余生产者数:', this.producers.size);
+    }
+
+    // 关闭摄像头生产者
+    async closeCameraProducers() {
+        console.log('=== 关闭摄像头生产者 ===');
+        const cameraProducers = [];
+        
+        for (const [producerId, producer] of this.producers) {
+            if (producer.appData?.type === 'camera' || producer.appData?.type === 'audio') {
+                console.log('🔄 找到摄像头生产者:', {
+                    id: producerId,
+                    kind: producer.kind,
+                    type: producer.appData?.type
+                });
+                cameraProducers.push(producerId);
+            }
+        }
+        
+        for (const producerId of cameraProducers) {
+            const producer = this.producers.get(producerId);
+            if (producer) {
+                console.log('⏹️ 关闭生产者:', producerId);
+                producer.close();
+                this.producers.delete(producerId);
+            }
+        }
+        
+        console.log('✅ 摄像头生产者已关闭，剩余生产者数:', this.producers.size);
     }
 }
 

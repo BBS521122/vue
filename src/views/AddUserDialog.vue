@@ -146,7 +146,7 @@ const open = () => {
 const handleSubmit = () => {
   formRef.value.validate(async (valid) => {
     if (valid) {
-      const response = await axios.post('http://localhost:8080/admin/add-user', form.value)
+      const response = await axios.post('/admin/add-user', form.value)
       // 检查返回状态码
       if (response.data.code === 200) {
         ElMessage.success('添加用户成功')

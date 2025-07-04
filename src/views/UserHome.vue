@@ -244,44 +244,13 @@ const currentPage = ref(1)
 const pageSize = ref(6)
 const total = ref(48)
 
-import userManagementImage from '@/assets/用户管理.jpg'
-import DepartmentManagementImage from '@/assets/组织管理.jpg'
-import conferenceImage from '@/assets/会议管理.jpg'
-import tenantManagementImage from '@/assets/租户管理.jpg'
-import newsManagementImage from '@/assets/行业动态.jpg'
-import courseManagementImage from '@/assets/课程管理.jpg'
-
 // 课程列表数据
 const courseList = ref([
-  {
-    id: 1,
-    title: '用户管理子系统',
-    description: '2023级软件系统开发实训，学习用户管理相关功能的设计与实现',
-    image: userManagementImage,
-    tag: '进行中',
-    students: 48,
-    rating: 4.8,
-    views: 290,
-    duration: '2.0',
-    status: '实训课程'
-  },
-  {
-    id: 2,
-    title: '组织管理子系统',
-    description: '欢迎加入我们的计算机网络课程！本课程旨在为您提供计算机网络领域的全面知识',
-    image: DepartmentManagementImage,
-    tag: '进行中',
-    students: 40,
-    rating: 4.7,
-    views: 314,
-    duration: '1.5',
-    status: '必修课'
-  },
   {
     id: 3,
     title: '行业动态管理子系统',
     description: '《软件系统设计实训》是一门软件工程专业实训课程，培养学生系统设计能力',
-    image: newsManagementImage,
+    image: 'https://via.placeholder.com/400x200?text=行业动态管理&bg=e6a23c&color=fff',
     tag: '已结束',
     students: 32,
     rating: 4.6,
@@ -293,7 +262,7 @@ const courseList = ref([
     id: 4,
     title: '课程管理子系统',
     description: '《软件需求分析与设计》为全日制大学本科软件工程专业的专业课程',
-    image: courseManagementImage,
+    image: 'https://via.placeholder.com/400x200?text=课程管理子系统&bg=f56c6c&color=fff',
     tag: '已结束',
     students: 48,
     rating: 4.8,
@@ -305,25 +274,13 @@ const courseList = ref([
     id: 5,
     title: '会议管理子系统',
     description: '会议管理子系统涵盖会议预订、会议室管理、会议通知等核心功能模块',
-    image: conferenceImage,
+    image: 'https://via.placeholder.com/400x200?text=会议管理子系统&bg=909399&color=fff',
     tag: '已结束',
     students: 48,
     rating: 4.8,
     views: 284,
     duration: '1.8',
     status: '必修课'
-  },
-  {
-    id: 6,
-    title: '租户管理子系统',
-    description: '租户管理子系统实现多租户架构下的数据隔离和权限管理功能',
-    image: tenantManagementImage,
-    tag: '进行中',
-    students: 36,
-    rating: 4.5,
-    views: 210,
-    duration: '2.2',
-    status: '选修课'
   }
 ])
 
@@ -397,7 +354,6 @@ const handleHeaderIconClick = debounce((iconType: string) => {
 }, 300)
 
 let avatar = ref("https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png")
-
 
 axios.get('/user/get-avatar')
     .then(response => {
@@ -739,3 +695,4 @@ axios.get('/user/get-avatar')
   }
 }
 </style>
+

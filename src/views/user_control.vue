@@ -158,8 +158,6 @@ const formatDate = (dateString) => {
   }
 }
 
-// 配置API基础URL
-const API_BASE_URL = 'http://localhost:8080'
 
 // 防抖函数
 const debounce = (fn, delay) => {
@@ -212,7 +210,7 @@ let cancelTokenSource = null
 const loadOrganizationData = async () => {
   orgLoading.value = true
   try {
-    const response = await axios.get(`${API_BASE_URL}/search-dept`)
+    const response = await axios.get(`/search-dept`)
     const flatData = response.data
     allDepartments.value = flatData
 
@@ -288,7 +286,7 @@ const getUserList = async () => {
       pageSize: pageSize.value
     }
 
-    const response = await axios.post(`${API_BASE_URL}/admin/get-user`, requestBody, {
+    const response = await axios.post(`/admin/get-user`, requestBody, {
       params,
       cancelToken: cancelTokenSource.token
     })
@@ -401,7 +399,7 @@ const handleStateChange = async (row) => {
 
   row.stateLoading = true
   try {
-    const response = await axios.post(`${API_BASE_URL}/admin/update-state`, {
+    const response = await axios.post(`/admin/update-state`, {
       id: row.id,
       state: row.state
     })
@@ -434,7 +432,7 @@ const handleDelete = async (row) => {
         }
     )
 
-    const response = await axios.get(`${API_BASE_URL}/admin/delete-user?id=${row.id}`)
+    const response = await axios.get(`/admin/delete-user?id=${row.id}`)
 
     if (response.data.code === 200) {
       ElMessage.success('删除成功')
@@ -486,7 +484,7 @@ const customUpload = async ({file}) => {
       }))
 
       try {
-        const response = await axios.post(`${API_BASE_URL}/admin/import-user`, formattedData)
+        const response = await axios.post(`/admin/import-user`, formattedData)
         if (response.data.code === 200) {
           ElMessage.success('导入成功！')
           getUserList()

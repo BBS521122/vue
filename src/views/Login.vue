@@ -2,7 +2,7 @@
   <div class="login-container">
     <div class="login-box">
       <div class="logo-area">
-        <img src="@/assets/logo.svg" alt="测盟汇管理系统" class="logo">
+        <img src="@/assets/logo.jpg" alt="测盟汇管理系统" class="logo">
         <h1 class="system-name">测盟汇管理系统</h1>
       </div>
 
@@ -53,13 +53,6 @@
                 </el-icon>
               </div>
             </div>
-          </div>
-        </el-form-item>
-
-        <el-form-item>
-          <div class="remember-forget-container">
-            <el-checkbox v-model="rememberMe">记住我</el-checkbox>
-            <el-link type="primary" class="forget-pwd" :underline="false">忘记密码?</el-link>
           </div>
         </el-form-item>
 
@@ -117,7 +110,7 @@ export default {
     const loginRules = reactive({
       name: [
         {required: true, message: '请输入用户名', trigger: 'blur'},
-        {min: 3, max: 20, message: '长度在3到20个字符', trigger: 'blur'}
+        {min: 2, max: 20, message: '长度在2到20个字符', trigger: 'blur'}
       ],
       password: [
         {required: true, message: '请输入密码', trigger: 'blur'},
@@ -215,13 +208,19 @@ export default {
         if (valid) {
           loading.value = true
 
-          axios.post('http://localhost:8080/user/login', {
+          axios.post('/user/login', {
             name: loginForm.name,
             password: loginForm.password,
           }).then(res => {
             loading.value = false
             if (res.data.code === 200) {
               const data = res.data.data
+              console.log(data)
+              if (data.state === '停用') {
+                ElMessage.error('账号已停用')
+                return
+              }
+
               ElMessage.success('登录成功')
               localStorage.setItem("role", data.role)
               localStorage.setItem("token", data.token)
@@ -280,7 +279,7 @@ export default {
   justify-content: center;
   align-items: center;
   height: 100vh;
-  background: url('@/assets/login-bg.jpg') no-repeat center center;
+  background: url('@/assets/背景.jpg') no-repeat center center;
   background-size: cover;
   position: relative;
 }

@@ -47,7 +47,6 @@
       </el-col>
     </el-row>
 
-
     <!-- 顶部筛选按钮 -->
     <div class="mb-2">
       <el-button type="primary" @click="filterByState('UNDER_CHECK')">审核中</el-button>
@@ -81,11 +80,12 @@
         </template>
       </el-table-column>
       <el-table-column prop="startTime" label="开始时间"/>
-      <el-table-column label="操作" width="180">
+      <el-table-column label="操作" width="240">
         <template #default="scope">
           <el-button type="primary" size="small" @click="openDialog(scope.row.id)">修改</el-button>
           <el-button type="danger" size="small" @click="handleDelete(scope.row.id)">删除</el-button>
           <el-button type="success" size="small" @click="handleApprove(scope.row.id)">审核</el-button>
+          <el-button type="info" size="small" @click="showParticipants(scope.row.id)">参会人员</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -116,6 +116,21 @@
         width="70%"
         :before-close="handleContentDialogClose"
     >
+      <template #header>
+        <div class="dialog-header">
+          <span>会议内容详情 - {{ currentConference?.name || '' }}</span>
+          <el-button
+              type="primary"
+              size="small"
+              @click="fetchTimelineStatus(currentConference?.id)"
+              :loading="timelineLoading"
+              class="refresh-btn"
+          >
+            刷新状态
+          </el-button>
+        </div>
+      </template>
+
       <div class="content-dialog">
         <div class="conference-info">
           <el-descriptions :column="2" border>
@@ -126,7 +141,7 @@
               {{ currentConference?.userName }}
             </el-descriptions-item>
             <el-descriptions-item label="会议状态">
-              <el-tag :type="getStatusType(currentConference.state)">
+              <el-tag :type="getStatusType(currentConference?.state)">
                 {{ currentConference?.state }}
               </el-tag>
             </el-descriptions-item>
@@ -140,22 +155,150 @@
           <h3 class="content-title">会议内容</h3>
           <div class="content-body" v-html="currentConference?.content"></div>
         </div>
+
+        <!-- 会议状态时间线 -->
+        <div class="timeline-section">
+          <h3 class="content-title">会议状态时间线</h3>
+          <el-timeline :reverse="true" class="horizontal-timeline">
+            <el-timeline-item
+                :timestamp="dayjs(currentConference?.startTime).format('YYYY-MM-DD HH:mm')"
+                :type="timelineStatus.startTime"
+                size="large"
+            >
+              会议开始
+            </el-timeline-item>
+
+            <el-timeline-item
+                :timestamp="dayjs(currentConference?.endTime).format('YYYY-MM-DD HH:mm')"
+                :type="timelineStatus.endTime"
+                size="large"
+            >
+              会议结束
+            </el-timeline-item>
+
+            <el-timeline-item
+                v-if="timelineStatus.recording === 'success'"
+                size="large"
+                type="success"
+            >
+              <span class="recording-item" @click="playRecording">
+                录屏上传成功 (点击播放)
+              </span>
+              <el-button
+                  type="text"
+                  size="small"
+                  @click="handleDeleteRecording"
+                  class="delete-recording-btn"
+              >
+                删除
+              </el-button>
+            </el-timeline-item>
+
+            <el-timeline-item
+                v-if="timelineStatus.recording === 'none'"
+                size="large"
+                type="danger"
+            >
+              无录屏
+            </el-timeline-item>
+
+            <!-- 修改后的语音转文字节点 - 不可点击 -->
+            <el-timeline-item
+                v-if="timelineStatus.transcription === 'success'"
+                size="large"
+                type="success"
+            >
+              语音转文字成功
+            </el-timeline-item>
+
+            <!-- 会议纪要和思维导图节点保持不变 -->
+            <el-timeline-item
+                v-if="timelineStatus.minutes === 'success'"
+                size="large"
+                type="success"
+            >
+              <span class="action-item" @click="fetchMinutesContent">
+                生成会议纪要成功 (点击查看)
+              </span>
+            </el-timeline-item>
+
+            <el-timeline-item
+                v-if="timelineStatus.mindmap === 'success'"
+                size="large"
+                type="success"
+            >
+              <span class="action-item" @click="fetchMindmapContent">
+                生成思维导图成功 (点击查看)
+              </span>
+            </el-timeline-item>
+          </el-timeline>
+        </div>
       </div>
 
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="contentDialogVisible = false">关闭</el-button>
-          <el-button type="primary" @click="openDialog(currentConference?.id)">
-            编辑会议
-          </el-button>
+            <el-button @click="contentDialogVisible = false">关闭</el-button>
+            <el-button type="primary" @click="openDialog(currentConference?.id)">
+                编辑会议
+            </el-button>
         </span>
+      </template>
+    </el-dialog>
+
+    <!-- 会议纪要对话框 -->
+    <el-dialog
+        v-model="minutesDialogVisible"
+        title="会议纪要"
+        width="60%"
+    >
+      <div class="minutes-content" v-html="minutesContent"></div>
+      <template #footer>
+        <el-button type="primary" @click="downloadContent(minutesContent, '会议纪要.html', 'text/html')">
+          下载HTML
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 思维导图对话框 -->
+    <el-dialog
+        v-model="mindmapDialogVisible"
+        title="会议思维导图"
+        width="80%"
+        fullscreen
+    >
+      <div class="mindmap-container">
+        <img :src="mindmapImageUrl" alt="会议思维导图" v-if="mindmapImageUrl">
+        <div v-else>加载中...</div>
+      </div>
+      <template #footer>
+        <el-button type="primary" @click="downloadContent(mindmapImageUrl, '思维导图.png', 'image/png')">
+          下载图片
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 参会人员对话框 -->
+    <el-dialog
+        v-model="participantsDialogVisible"
+        :title="`参会人员 - ${currentConferenceName}`"
+        width="50%"
+    >
+      <el-table :data="participantsList" border>
+        <el-table-column prop="name" label="姓名" width="180"/>
+        <el-table-column prop="unit" label="单位" width="180"/>
+        <el-table-column prop="gender" label="性别" width="180"/>
+        <el-table-column prop="phone" label="☎电话" width="180"/>
+        <el-table-column prop="email" label="📫邮箱" width="180"/>
+      </el-table>
+      <template #footer>
+        <el-button type="primary" @click="participantsDialogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script lang="ts">
-import {defineComponent, ref, watch} from 'vue'
+import {defineComponent, ref} from 'vue'
 import AddEditConferenceDialog from '../components/AddEditConferenceDialog.vue'
 import axios, {type CancelTokenSource} from "axios";
 import {ElMessage, ElMessageBox} from "element-plus";
@@ -163,25 +306,57 @@ import dayjs from "dayjs";
 
 export default defineComponent({
   name: 'ConferenceListView',
+  methods: {dayjs},
   components: {AddConferenceDialog: AddEditConferenceDialog},
   setup() {
     const showDialog = ref(false)
     const dialogId = ref<number | undefined>(undefined)
-
-    // 内容详情对话框相关
     const contentDialogVisible = ref(false)
     const currentConference = ref<Conference | null>(null)
-
-    // 分页相关
     const currentPage = ref(1)
     const pageSize = ref(10)
     const total = ref(0)
+    const recordingUrl = ref<string | null>(null)
+    const minutesDialogVisible = ref(false)
+    const mindmapDialogVisible = ref(false)
+    const minutesContent = ref('')
+    const mindmapImageUrl = ref('')
+    const timelineLoading = ref(false)
+    const participantsDialogVisible = ref(false)
+    const participantsList = ref<Participant[]>([])
+    const currentConferenceName = ref('')
 
-    const openDialog = (id?: number) => {
-      console.log(id)
-      dialogId.value = id
-      showDialog.value = true
+    // 时间线状态
+    const timelineStatus = ref({
+      startTime: 'grey',
+      endTime: 'grey',
+      recording: 'none', // 'none' | 'success'
+      transcription: 'none', // 'none' | 'success' (保留但不可点击)
+      minutes: 'none',    // 'none' | 'success'
+      mindmap: 'none'     // 'none' | 'success'
+    })
+
+    interface Conference {
+      id: number
+      name: string
+      userName: string
+      state: keyof typeof stateMap
+      endTime?: string
+      content: string
+      startTime?: string
     }
+
+    interface Participant {
+      name: string
+      unit: string
+      gender: string
+      phone: string
+      email: string
+      conferenceName: string
+    }
+
+    const conferenceList = ref<Conference[]>([])
+    const searchLoading = ref(false)
 
     const searchForm = ref({
       keyword: '',
@@ -189,37 +364,113 @@ export default defineComponent({
       dateRange: []
     })
 
+    const stateMap = {
+      UNDER_CHECK: '审核中',
+      APPROVED: '已通过',
+      REJECTED: '已拒绝',
+      ONGOING: '进行中',
+      COMPLETED: '已完成'
+    }
+
+    const openDialog = (id?: number) => {
+      dialogId.value = id
+      showDialog.value = true
+    }
+
     const filterByState = (state: keyof typeof stateMap) => {
       searchForm.value.status = state
       handleSearch()
     }
 
-    interface Conference {
-      id: number
-      name: string
-      userName: string
-      state: keyof typeof stateMap
-      start_time: string
-      end_time: string
-      content: string
-      startTime?: string
-    }
-
-    const conferenceList = ref<Conference[]>([])
-
-    // 显示内容详情对话框
-    const showContentDialog = (conference: Conference) => {
+    const showContentDialog = async (conference: Conference) => {
       currentConference.value = conference
       contentDialogVisible.value = true
+
+      // 初始化时间线状态
+      timelineStatus.value = {
+        startTime: 'grey',
+        endTime: 'grey',
+        recording: 'none',
+        transcription: 'none',
+        minutes: 'none',
+        mindmap: 'none'
+      }
+
+      // 获取时间线状态
+      await fetchTimelineStatus(conference.id)
     }
 
-    // 关闭内容详情对话框
+    const showParticipants = async (conferenceId: number) => {
+      try {
+        const res = await axios.get('/receipt/participants', {
+          params: {conferenceId}
+        })
+
+        if (res.data.code === 200) {
+          participantsList.value = res.data.data || []
+          currentConferenceName.value = participantsList.value[0]?.conferenceName || '未知会议'
+          participantsDialogVisible.value = true
+        } else {
+          ElMessage.error(res.data.message || '获取参会人员失败')
+        }
+      } catch (err) {
+        ElMessage.error('获取参会人员失败')
+        console.error(err)
+      }
+    }
+
+    const getParticipantStatusType = (status: string) => {
+      switch (status) {
+        case '已确认':
+          return 'success'
+        case '待确认':
+          return 'warning'
+        case '已拒绝':
+          return 'danger'
+        default:
+          return 'info'
+      }
+    }
+
+    const fetchTimelineStatus = async (conferenceId: number) => {
+      timelineLoading.value = true
+      try {
+        const res = await axios.get('/conference/timeline-status', {
+          params: {conferenceId}
+        })
+
+        if (res.data.code === 200) {
+          const data = res.data.data
+          const now = dayjs()
+
+          // 更新基础时间线状态
+          timelineStatus.value.startTime = now.isAfter(dayjs(data.startTime)) ? 'success' : 'grey'
+          timelineStatus.value.endTime = now.isAfter(dayjs(data.endTime)) ? 'success' : 'grey'
+          timelineStatus.value.recording = data.hasRecording ? 'success' : 'none'
+
+          // 更新状态节点
+          timelineStatus.value.transcription = data.hasTranscription ? 'success' : 'none'
+          timelineStatus.value.minutes = data.hasMinutes ? 'success' : 'none'
+          timelineStatus.value.mindmap = data.hasMindmap ? 'success' : 'none'
+
+          // 保存录屏URL
+          recordingUrl.value = data.recordingUrl || null
+
+          ElMessage.success('状态已刷新')
+        }
+      } catch (err) {
+        console.error('获取时间线状态失败:', err)
+        ElMessage.error('刷新状态失败')
+      } finally {
+        timelineLoading.value = false
+      }
+    }
+
     const handleContentDialogClose = (done: () => void) => {
       currentConference.value = null
       done()
     }
 
-    // 获取状态对应的标签类型
     const getStatusType = (status: string) => {
       switch (status) {
         case '审核中':
@@ -237,16 +488,6 @@ export default defineComponent({
       }
     }
 
-    const stateMap = {
-      UNDER_CHECK: '审核中',
-      APPROVED: '已通过',
-      REJECTED: '已拒绝',
-      ONGOING: '进行中',
-      COMPLETED: '已完成'
-    }
-
-    const searchLoading = ref(false)
-
     const resetSearch = () => {
       searchForm.value = {
         keyword: '',
@@ -257,42 +498,26 @@ export default defineComponent({
       fetchConferenceList()
     }
 
-    watch(
-        () => ({
-          keyword: searchForm.value.keyword,
-          status: searchForm.value.status,
-          dateRange: searchForm.value.dateRange
-        }),
-        () => {
-          currentPage.value = 1
-          debouncedSearch()
-        },
-        {deep: true}
-    )
+    const cancelTokenSource = ref<CancelTokenSource | null>(null)
 
     interface SearchRequestBody {
       keyword: string | null;
       status: string | null;
-      startTime: any | null;  // 你可以用更具体的类型替代 any
-      endTime: any | null;    // 你可以用更具体的类型替代 any
-      [key: string]: any;     // 添加索引签名
+      startTime: any | null;
+      endTime: any | null;
+
+      [key: string]: any;
     }
 
-    // 获取会议列表数据
-    const cancelTokenSource = ref<CancelTokenSource | null>(null)
-
     const fetchConferenceList = async () => {
-      // 取消之前的请求
       if (cancelTokenSource.value) {
         cancelTokenSource.value.cancel('Operation canceled due to new request.')
       }
 
-      // 创建新的取消令牌
       cancelTokenSource.value = axios.CancelToken.source()
-
       searchLoading.value = true
+
       try {
-        // 构建请求参数
         const requestBody: SearchRequestBody = {
           keyword: searchForm.value.keyword?.trim() || null,
           status: searchForm.value.status || null,
@@ -300,7 +525,6 @@ export default defineComponent({
           endTime: searchForm.value.dateRange?.[1] || null
         }
 
-        // 清理空值参数
         Object.keys(requestBody).forEach(key => {
           if (requestBody[key] === undefined || requestBody[key] === '') {
             requestBody[key] = null
@@ -347,19 +571,16 @@ export default defineComponent({
 
     const debouncedSearch = debounce(fetchConferenceList, 500)
 
-    // 搜索
     const handleSearch = () => {
       currentPage.value = 1
       debouncedSearch()
     }
 
-    // 分页变化
     const handlePageChange = (page: number) => {
       currentPage.value = page
       fetchConferenceList()
     }
 
-    // 删除会议
     const handleDelete = (id?: number) => {
       ElMessageBox.confirm('确定要删除该会议吗?', '提示', {
         confirmButtonText: '确定',
@@ -367,7 +588,6 @@ export default defineComponent({
         type: 'warning'
       }).then(async () => {
         try {
-          console.log(id)
           const res = await axios.get(`/conference/delete?id=${id}`)
           if (res.data.code === 200) {
             ElMessage.success('删除成功')
@@ -384,57 +604,105 @@ export default defineComponent({
       })
     }
 
+    const handleDeleteRecording = async () => {
+      try {
+        const res = await axios.post('/conference/delete-recording', {
+          conferenceId: currentConference.value?.id
+        })
+
+        if (res.data.code === 200) {
+          ElMessage.success('删除录屏成功')
+          timelineStatus.value.recording = 'none'
+          recordingUrl.value = null
+        } else {
+          ElMessage.error(res.data.message || '删除录屏失败')
+        }
+      } catch (err) {
+        ElMessage.error('删除录屏失败')
+        console.error(err)
+      }
+    }
+
+    const playRecording = () => {
+      if (recordingUrl.value) {
+        window.open(recordingUrl.value, '_blank')
+      }
+    }
+
+    const fetchMinutesContent = async () => {
+      try {
+        const res = await axios.get('/conference/get-minutes', {
+          params: {conferenceId: currentConference.value?.id}
+        })
+        if (res.data.code === 200) {
+          minutesContent.value = res.data.data.content
+          minutesDialogVisible.value = true
+        } else {
+          ElMessage.error(res.data.message || '获取会议纪要失败')
+        }
+      } catch (err) {
+        ElMessage.error('获取会议纪要失败')
+        console.error(err)
+      }
+    }
+
+    const fetchMindmapContent = async () => {
+      try {
+        const res = await axios.get('/conference/get-mindmap', {
+          params: {conferenceId: currentConference.value?.id}
+        })
+        if (res.data.code === 200) {
+          // 假设返回的JSON数据可以直接用于渲染思维导图
+          const mindmapData = res.data.data.json
+
+          // 这里可以调用渲染思维导图的函数
+          renderMindmap(mindmapData)
+
+          mindmapDialogVisible.value = true
+        } else {
+          ElMessage.error(res.data.message || '获取思维导图失败')
+        }
+      } catch (err) {
+        ElMessage.error('获取思维导图失败')
+        console.error(err)
+      }
+    }
+
+    const downloadContent = (content: string, filename: string, type: string) => {
+      if (!content) return
+
+      const blob = new Blob([content], {type})
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    }
+
     const extractPureText = (html: string) => {
       if (!html) return '';
 
       try {
-        // 创建临时div元素
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = html;
 
-        // 更全面的视频元素移除策略
-        // 1. 移除所有video标签
-        const videos = tempDiv.querySelectorAll('video');
-        videos.forEach(video => video.remove());
+        const videos = tempDiv.querySelectorAll('video, [data-w-e-type="video"], .video-container, .w-e-video-container, iframe, embed, object');
+        videos.forEach(element => element.remove());
 
-        // 2. 移除带有视频相关data属性的元素
-        const videoElements = tempDiv.querySelectorAll('[data-w-e-type="video"]');
-        videoElements.forEach(element => element.remove());
-
-        // 3. 移除其他可能的视频容器
-        const videoContainers = tempDiv.querySelectorAll('.video-container, .w-e-video-container');
-        videoContainers.forEach(container => container.remove());
-
-        // 4. 移除iframe（可能包含视频）
-        const iframes = tempDiv.querySelectorAll('iframe');
-        iframes.forEach(iframe => {
-          // 检查iframe是否是视频相关的
-          const src = iframe.src?.toLowerCase() || '';
-          if (src.includes('video') || src.includes('player') || src.includes('embed')) {
-            iframe.remove();
-          }
-        });
-
-        // 5. 移除embed和object标签（可能包含视频）
-        const embeds = tempDiv.querySelectorAll('embed, object');
-        embeds.forEach(embed => embed.remove());
-
-        // 获取纯文本
         let pureText = tempDiv.textContent || tempDiv.innerText || '';
-
-        // 清理文本
         pureText = pureText
-            .replace(/\s+/g, ' ') // 替换多个空格为单个空格
-            .replace(/\n+/g, ' ') // 替换多个换行为单个空格
-            .trim(); // 去除首尾空格
+            .replace(/\s+/g, ' ')
+            .replace(/\n+/g, ' ')
+            .trim();
 
-        // 如果文本为空或只包含空白字符，返回提示信息
         if (!pureText || pureText.length === 0) {
           return '内容为空或仅包含媒体文件';
         }
 
-        // 限制显示长度（可选）
-        const maxLength = 50; // 缩短预览长度
+        const maxLength = 50;
         if (pureText.length > maxLength) {
           return pureText.substring(0, maxLength) + '...';
         }
@@ -469,7 +737,6 @@ export default defineComponent({
       })
     }
 
-
     // 初始化获取数据
     fetchConferenceList()
 
@@ -487,7 +754,6 @@ export default defineComponent({
       handlePageChange,
       fetchConferenceList,
       extractPureText,
-      // 新增的内容详情相关
       contentDialogVisible,
       currentConference,
       showContentDialog,
@@ -496,7 +762,24 @@ export default defineComponent({
       filterByState,
       resetSearch,
       searchLoading,
-      handleApprove
+      handleApprove,
+      timelineStatus,
+      playRecording,
+      handleDeleteRecording,
+      minutesDialogVisible,
+      mindmapDialogVisible,
+      minutesContent,
+      mindmapImageUrl,
+      fetchMinutesContent,
+      fetchMindmapContent,
+      downloadContent,
+      fetchTimelineStatus,
+      timelineLoading,
+      showParticipants,
+      participantsDialogVisible,
+      participantsList,
+      currentConferenceName,
+      getParticipantStatusType
     }
   }
 })
@@ -596,5 +879,45 @@ export default defineComponent({
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+}
+
+.recording-item {
+  cursor: pointer;
+  margin-right: 10px;
+}
+
+.recording-item:hover {
+  color: #66b1ff;
+}
+
+.delete-recording-btn {
+  margin-left: 10px;
+}
+
+.action-item {
+  cursor: pointer;
+}
+
+.action-item:hover {
+  color: #66b1ff;
+  text-decoration: underline;
+}
+
+.minutes-content {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.mindmap-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+}
+
+.mindmap-container img {
+  max-width: 100%;
+  max-height: 80vh;
+  object-fit: contain;
 }
 </style>

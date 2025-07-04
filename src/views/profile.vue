@@ -1,37 +1,90 @@
 <template>
   <div class="profile-container">
     <div class="profile-header">
-      <h2>基本资料</h2>
+      <div class="header-content">
+        <el-button
+            type="text"
+            @click="handleGoBack"
+            class="back-button"
+        >
+          <el-icon class="back-icon">
+            <ArrowLeft/>
+          </el-icon>
+          <span>返回</span>
+        </el-button>
+        <h2>基本资料</h2>
+      </div>
     </div>
 
     <div class="profile-content">
       <div class="profile-section">
-        <div class="section-title">基本资料</div>
+        <div class="section-title">
+          基本资料
+          <el-button
+              type="primary"
+              size="small"
+              @click="toggleEditMode"
+              :loading="infoLoading"
+              style="float: right;"
+          >
+            {{ isEditing ? '取消' : '编辑' }}
+          </el-button>
+          <el-button
+              v-if="isEditing"
+              type="success"
+              size="small"
+              @click="handleSaveInfo"
+              :loading="infoLoading"
+              style="float: right; margin-right: 10px;"
+          >
+            保存
+          </el-button>
+        </div>
         <div class="section-content">
-          <div class="info-row">
-            <div class="info-label">用户昵称</div>
-            <div class="info-value">{{ userInfo.nickname || '--' }}</div>
-          </div>
-          <div class="info-row">
-            <div class="info-label">手机号码</div>
-            <div class="info-value">{{ userInfo.phone || '--' }}</div>
-          </div>
-          <div class="info-row">
-            <div class="info-label">邮箱</div>
-            <div class="info-value">{{ userInfo.email || '--' }}</div>
-          </div>
-          <div class="info-row">
-            <div class="info-label">性别</div>
-            <div class="info-value">
-              <el-radio-group v-model="userInfo.gender" @change="handleUpdateInfo">
+          <el-form
+              :model="userInfo"
+              label-width="120px"
+              style="max-width: 500px"
+              :rules="userInfoRules"
+              ref="userInfoFormRef"
+          >
+            <el-form-item label="用户昵称" prop="nickname">
+              <el-input
+                  v-if="isEditing"
+                  v-model="userInfo.nickname"
+                  placeholder="请输入用户昵称"
+              />
+              <span v-else class="info-display">{{ userInfo.nickname || '--' }}</span>
+            </el-form-item>
+            <el-form-item label="手机号码" prop="phone">
+              <el-input
+                  v-if="isEditing"
+                  v-model="userInfo.phone"
+                  placeholder="请输入手机号码"
+              />
+              <span v-else class="info-display">{{ userInfo.phone || '--' }}</span>
+            </el-form-item>
+            <el-form-item label="邮箱" prop="email">
+              <el-input
+                  v-if="isEditing"
+                  v-model="userInfo.email"
+                  placeholder="请输入邮箱地址"
+              />
+              <span v-else class="info-display">{{ userInfo.email || '--' }}</span>
+            </el-form-item>
+            <el-form-item label="性别" prop="gender">
+              <el-radio-group
+                  v-model="userInfo.gender"
+                  :disabled="!isEditing"
+                  @change="isEditing && handleGenderChange"
+              >
                 <el-radio label="男" size="large">男</el-radio>
                 <el-radio label="女" size="large">女</el-radio>
               </el-radio-group>
-            </div>
-          </div>
+            </el-form-item>
+          </el-form>
         </div>
       </div>
-
 
       <div class="profile-section">
         <div class="section-title">修改密码</div>
@@ -114,9 +167,23 @@
 
 <script setup lang="ts">
 import {ref, onMounted, reactive} from 'vue'
-import {ElMessage, ElRadioGroup, ElRadio, ElForm, ElFormItem, ElInput, ElButton, ElUpload} from 'element-plus'
+import {
+  ElMessage,
+  ElRadioGroup,
+  ElRadio,
+  ElForm,
+  ElFormItem,
+  ElInput,
+  ElButton,
+  ElUpload,
+  ElMessageBox
+} from 'element-plus'
 import {Plus, Loading} from '@element-plus/icons-vue'
 import type {FormInstance, FormRules} from 'element-plus'
+
+// 编辑状态
+const isEditing = ref(false)
+const infoLoading = ref(false)
 
 // 用户信息
 const userInfo = reactive<UserInfo & { avatar: string }>({
@@ -126,6 +193,34 @@ const userInfo = reactive<UserInfo & { avatar: string }>({
   gender: '男',
   avatar: ''
 });
+
+// 保存原始用户信息，用于取消编辑时恢复
+const originalUserInfo = reactive<UserInfo & { avatar: string }>({
+  nickname: '',
+  phone: '',
+  email: '',
+  gender: '男',
+  avatar: ''
+});
+
+// 用户信息表单验证规则
+const userInfoRules: FormRules = {
+  nickname: [
+    {required: true, message: '请输入用户昵称', trigger: 'blur'},
+    {min: 2, max: 20, message: '昵称长度在2到20个字符', trigger: 'blur'}
+  ],
+  phone: [
+    {required: true, message: '请输入手机号码', trigger: 'blur'},
+    {pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号码', trigger: 'blur'}
+  ],
+  email: [
+    {required: true, message: '请输入邮箱地址', trigger: 'blur'},
+    {type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur'}
+  ],
+  gender: [
+    {required: true, message: '请选择性别', trigger: 'change'}
+  ]
+}
 
 // 密码表单
 const passwordForm = ref({
@@ -160,20 +255,113 @@ const passwordRules: FormRules = {
 }
 
 // 表单引用
+const userInfoFormRef = ref<FormInstance>()
 const passwordFormRef = ref<FormInstance>()
 
 // 加载状态
 const passwordLoading = ref(false)
 const avatarLoading = ref(false)
 
+// 返回功能
+const handleGoBack = () => {
+  // 如果正在编辑，提示用户是否保存
+  if (isEditing.value) {
+    ElMessageBox.confirm(
+        '您有未保存的修改，是否确认离开？',
+        '提示',
+        {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning',
+        }
+    ).then(() => {
+      // 用户确认离开，恢复原始数据并退出编辑模式
+      Object.assign(userInfo, originalUserInfo)
+      isEditing.value = false
+      // 执行返回操作
+      goBack()
+    }).catch(() => {
+      // 用户取消，不执行任何操作
+    })
+  } else {
+    // 没有在编辑，直接返回
+    goBack()
+  }
+}
+
+import {useRouter} from 'vue-router'
+const router = useRouter()
+
+// 实际的返回逻辑
+const goBack = () => {
+  if (localStorage.getItem('role') === 'ADMIN') {
+    router.push('/admin')
+  } else {
+    router.push('/user')
+  }
+}
+
+// 切换编辑模式
+const toggleEditMode = () => {
+  if (isEditing.value) {
+    // 取消编辑，恢复原始数据
+    Object.assign(userInfo, originalUserInfo)
+    isEditing.value = false
+  } else {
+    // 进入编辑模式，保存当前数据
+    Object.assign(originalUserInfo, userInfo)
+    isEditing.value = true
+  }
+}
+
+// 保存用户信息
+const handleSaveInfo = async () => {
+  try {
+    await userInfoFormRef.value?.validate()
+    infoLoading.value = true
+
+    // 创建用户信息对象
+    const userInfoData: UserInfo = {
+      nickname: userInfo.nickname,
+      phone: userInfo.phone,
+      email: userInfo.email,
+      gender: userInfo.gender
+    }
+
+    // 调用更新用户信息的API，传送用户信息类对象
+    const response = await axios.post('/user/update', userInfoData)
+
+    if (response.data.code == 200) {
+      ElMessage.success('用户信息更新成功')
+      // 更新原始数据
+      Object.assign(originalUserInfo, userInfo)
+      isEditing.value = false
+    } else {
+      ElMessage.error(response.data.message || '用户信息更新失败')
+    }
+  } catch (error) {
+    console.error('用户信息更新失败:', error)
+    ElMessage.error('用户信息更新失败')
+  } finally {
+    infoLoading.value = false
+  }
+}
+
+// 处理性别变化（在编辑模式下立即保存）
+const handleGenderChange = () => {
+  // 如果需要性别变化立即生效，可以在这里调用API
+  // 当前实现是等待用户点击保存按钮
+}
+
 // 加载用户信息
 const loadUserInfo = async () => {
   try {
-    axios.get('http://localhost:8080/user/get')
+    axios.get('/user/get')
         .then(response => {
           if (response.data.code == 200 && response.data.data) {
             console.log(response.data)
             Object.assign(userInfo, response.data.data)
+            Object.assign(originalUserInfo, response.data.data)
           } else {
             ElMessage.error('获取用户信息失败')
           }
@@ -182,35 +370,25 @@ const loadUserInfo = async () => {
       ElMessage.error('获取用户信息失败')
     })
 
-    axios.get('http://localhost:8080/user/get-avatar')
+    axios.get('/user/get-avatar')
         .then(response => {
           if (response.data.code == 200 && response.data.data) {
             console.log(response.data)
             userInfo.avatar = response.data.data
+            originalUserInfo.avatar = response.data.data
           } else {
             ElMessage.error('暂无头像，以默认头像代替')
             userInfo.avatar = "https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png"
+            originalUserInfo.avatar = "https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png"
           }
         }).catch(error => {
       console.error('暂无头像:', error)
       ElMessage.error('暂无头像，以默认头像代替')
       userInfo.avatar = "https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png"
+      originalUserInfo.avatar = "https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png"
     })
   } catch (error) {
     ElMessage.error('获取用户信息失败')
-  }
-}
-
-// 更新用户信息
-const handleUpdateInfo = async () => {
-  try {
-    // await updateUserInfo({
-    //   gender: userInfo.value.gender,
-    //   nickname: userInfo.value.nickname
-    // })
-    ElMessage.success('信息更新成功')
-  } catch (error) {
-    ElMessage.error('信息更新失败')
   }
 }
 
@@ -221,7 +399,7 @@ const handleChangePassword = async () => {
 
     passwordLoading.value = true
 
-    await axios.post(`http://localhost:8080/user/update-password`, {
+    await axios.post(`/user/update-password`, {
       oldPassword: passwordForm.value.currentPassword,
       newPassword: passwordForm.value.newPassword,
     })
@@ -259,9 +437,10 @@ const handleAvatarUpload = async (options: any) => {
     avatarLoading.value = true
     const formData = new FormData();
     formData.append('file', options.file);
-    const response = await axios.post('http://localhost:8080/user/update_avatar', formData);
+    const response = await axios.post('/user/update_avatar', formData);
     if (response.data.code == 200) {
       userInfo.avatar = response.data.url + '?t=' + Date.now();
+      originalUserInfo.avatar = response.data.url + '?t=' + Date.now();
       console.log(response.data)
       ElMessage.success('头像上传成功！');
     } else {
@@ -305,41 +484,12 @@ export interface UserInfo {
   gender: string;
 }
 
-
 // 密码表单类型
 export interface PasswordForm {
   currentPassword: string;
   newPassword: string;
   confirmPassword: string;
 }
-
-// // 更新用户信息
-// export const updateUserInfo = async (data: {
-//   gender: string;
-//   nickname: string
-// }): Promise<AxiosResponse<void>> => {
-//   return axios.post('http://localhost:8080/user/get', data);
-// };
-//
-//
-// // 更新密码
-// export const updatePassword = async (data: {
-//   currentPassword: string;
-//   newPassword: string
-// }): Promise<AxiosResponse<void>> => {
-//   return axios.post('http://localhost:8080/user/get', data);
-// };
-//
-// // 上传头像
-// export const uploadAvatar = async (file: File): Promise<AxiosResponse<{ avatarUrl: string }>> => {
-//   const formData = new FormData();
-//   formData.append('avatar', file);
-//   return axios.post('http://localhost:8080/user/get', formData, {
-//     headers: {
-//       'Content-Type': 'multipart/form-data'
-//     }
-//   });
-// };
 </script>
 
 <style scoped>

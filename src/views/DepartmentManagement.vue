@@ -191,13 +191,10 @@ import axios from 'axios'
  const allDepartments = ref([]) // 新增：用于存储所有部门的扁平列表
 const formRef = ref(null)
 
-// 配置API基础URL
-const API_BASE_URL = 'http://localhost:8080'
-
 // 用户信息
 const user = reactive({
-  name: '管理员',
-  role: 'admin',
+  name: localStorage.getItem('username'),
+  role: localStorage.getItem('role'),
   lastLogin: new Date().toLocaleString()
 })
 

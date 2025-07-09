@@ -1,9 +1,20 @@
 import {createRouter, createWebHistory} from 'vue-router'
+import HomeView from '../views/home_admin.vue'
+import AuditList from "@/views/AuditList.vue";
+import CourseList from "@/views/CourseList.vue";
+import CourseDetail from "@/views/CourseDetail.vue";
+import ChapterDetail from "@/views/ChapterDetail.vue";
+
 import axios from "axios";
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
     routes: [
+        { path: '/audit', name: 'AuditList', component: AuditList },
+        { path: '/courses', name: 'CourseList', component: CourseList },
+        { path: '/course/:id', name: 'CourseDetail', component: CourseDetail },
+        { path: '/course/:courseId/chapters', name: 'ChapterDetail', component:
+            ChapterDetail },
         {
             path: '/',
             redirect: '/login'

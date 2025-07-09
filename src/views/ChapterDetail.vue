@@ -2,9 +2,6 @@
   <div class="chapter-detail">
     <!-- 顶部导航 -->
     <div class="header-nav">
-      <a href="#" @click="goToHome">首页</a>
-      <a href="#">资讯管理</a>
-      <a href="#" @click="goToCourseList">课程管理</a>
       <a href="#" @click="goToCourseDetail">课程详情</a>
       <a href="#" class="active">章节管理</a>
     </div>
@@ -256,7 +253,7 @@ export default {
     const fetchCourseInfo = async () => {
       try {
         const response = await axios.get(
-            `http://localhost:8848/course/get-course-info?courseId=${courseId.value}`
+            `/course/get-course-info?courseId=${courseId.value}`
         );
         if (response.data && response.data.code === 200) {
           courseInfo.value = response.data.data;
@@ -275,7 +272,7 @@ export default {
         await fetchCourseInfo();
 
         const response = await axios.get(
-            `http://localhost:8848/course/get-chapter?courseId=${courseId.value}`
+            `/course/get-chapter?courseId=${courseId.value}`
         );
 
         if (response.data && response.data.code === 200) {
@@ -344,7 +341,7 @@ export default {
         const formData = new FormData();
         formData.append('file', file);
 
-        const response = await axios.post('http://localhost:8848/course/upload', formData, {
+        const response = await axios.post('/course/upload', formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
 
@@ -384,7 +381,7 @@ export default {
         const formData = new FormData();
         formData.append('file', file);
 
-        const response = await axios.post('http://localhost:8848/course/upload', formData, {
+        const response = await axios.post('/course/upload', formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
 
@@ -492,7 +489,7 @@ export default {
           order: chapter.order
         }));
 
-        const response = await axios.post('http://localhost:8848/course/add-update-course', {
+        const response = await axios.post('/course/add-update-course', {
           courseId: courseId.value,
           chapters: chaptersData
         });
@@ -504,7 +501,7 @@ export default {
           throw new Error(response.data?.message || '保存失败');
         }
 
-        await axios.post('http://localhost:8848/course/add-update-course', {
+        await axios.post('/course/add-update-course', {
           courseId: courseId.value,
           chapters: chaptersData
         });

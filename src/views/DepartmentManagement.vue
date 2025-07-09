@@ -285,7 +285,7 @@ function expandOrCollapseAll(data, expand) {
           deptName: searchForm.deptName,
           status: searchForm.status === '' ? null : searchForm.status
         }
-        const response = await axios.get(`${API_BASE_URL}/search-dept`, { params })
+        const response = await axios.get(`/search-dept`, { params })
         const flatData = response.data
         allDepartments.value = flatData // 保存完整的扁平数据
 
@@ -384,7 +384,7 @@ const handleDelete = async (row) => {
     })
     
     // 修改为使用/delete-dept接口
-    await axios.get(`${API_BASE_URL}/delete-dept?id=${row.id}`)
+    await axios.get(`/delete-dept?id=${row.id}`)
     ElMessage.success('删除成功')
     loadData()
   } catch (error) {
@@ -413,11 +413,11 @@ const handleSubmit = async () => {
     
     if (dialog.isEdit) {
       // 修改为使用/update-dept接口
-      await axios.post(`${API_BASE_URL}/update-dept`, form)
+      await axios.post(`/update-dept`, form)
       ElMessage.success('修改成功')
     } else {
       // 修改为使用/add-dept接口
-      await axios.post(`${API_BASE_URL}/add-dept`, form)
+      await axios.post(`/add-dept`, form)
       ElMessage.success('新增成功')
     }
     dialog.visible = false

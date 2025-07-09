@@ -43,10 +43,12 @@ import { ElMessage } from 'element-plus'
 
 // 导入首页组件
 import UserHome from '../views/UserHome.vue'
+import {OfficeBuilding} from "@element-plus/icons-vue";
 
 // 异步导入其他组件
 const UserConference = defineAsyncComponent(() => import('../views/userConference.vue'))
 const UserNew = defineAsyncComponent(() => import('../views/NewList.vue'))
+const Course= defineAsyncComponent(() => import('../views/UserCourseList.vue'))
 
 const router = useRouter()
 const route = useRoute()
@@ -62,6 +64,14 @@ const tabConfigMap = {
     component: UserNew,
     route: '/user/news',
     closable: true
+  },
+  4: {
+    name: 'course',
+    title: '课程管理',
+    component: Course,
+    route: '/system/detail/4',
+    closable: true,
+    icon: OfficeBuilding
   },
   5: {
     name: 'user-conference',

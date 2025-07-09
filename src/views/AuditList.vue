@@ -2,9 +2,6 @@
   <div class="audit-container">
     <!-- 顶部导航栏 -->
     <div class="header-nav">
-      <a href="#" @click="goBack">首页</a>
-      <a href="#">资讯管理</a>
-      <a href="#" @click="goToCourseList">课程管理</a>
       <a href="#" class="active">课程审核</a>
     </div>
 
@@ -205,7 +202,7 @@ export default {
         error.value = null;
 
         // 修改为直接调用待审核课程接口
-        const response = await axios.get('http://localhost:8848/course/getPendingCourses');
+        const response = await axios.get('/course/getPendingCourses');
 
         if (response.data) {
           pendingCourses.value = response.data;
@@ -288,8 +285,8 @@ export default {
 
         // 根据操作类型选择不同的API端点
         const url = action === 'approve'
-            ? 'http://localhost:8848/course/approveCourse'
-            : 'http://localhost:8848/course/rejectCourse';
+            ? '/course/approveCourse'
+            : '/course/rejectCourse';
 
         // 确保传递整数类型的courseId
         const response = await axios.post(url, {
@@ -321,15 +318,6 @@ export default {
       return '未知时间';
     };
 
-    // 导航方法
-    const goBack = () => {
-      router.push({ name: 'RoleSelect' });
-    };
-
-    const goToCourseList = () => {
-      router.push({ name: 'CourseList' });
-    };
-
     onMounted(() => {
       fetchPendingCourses();
     });
@@ -357,9 +345,7 @@ export default {
       approveCourse,
       rejectCourse,
       confirmAudit,
-      formatDate,
-      goBack,
-      goToCourseList
+      formatDate
     };
   }
 }

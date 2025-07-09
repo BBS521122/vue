@@ -324,6 +324,18 @@ const courseList = ref([
     views: 210,
     duration: '2.2',
     status: '选修课'
+  },
+  {
+    id: 7,
+    title: '课程审核子系统',
+    description: '租户管理子系统实现多租户架构下的数据隔离和权限管理功能',
+    image: courseManagementImage,
+    tag: '进行中',
+    students: 36,
+    rating: 4.5,
+    views: 210,
+    duration: '2.2',
+    status: '选修课'
   }
 ])
 

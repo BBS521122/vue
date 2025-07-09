@@ -81,6 +81,16 @@ const router = createRouter({
                     }
                 },
                 {
+                    path: 'course',
+                    name: 'userCourse',
+                    component: () => import('../views/UserCourseList.vue'),
+                    meta: {
+                        title: '课程管理',
+                        keepAlive: true,
+                        showInTabs: true
+                    }
+                },
+                {
                     path: 'news',
                     name: 'userNews',
                     component: () => import('../views/NewList.vue'),
@@ -132,6 +142,17 @@ const router = createRouter({
                 activeTab: 'new'
             }
         },
+        // 在 router/index.ts 中修改标签页路由
+        {
+            path: '/system/detail/4',
+            name: 'Course',
+            component: () => import('../components/TabsContainer.vue'),
+            meta: {
+                title: '课程管理',
+                tabView: true,
+                activeTab: 'course'
+            }
+        },
         {
             path: '/system/detail/5',
             name: 'Conference',
@@ -145,6 +166,16 @@ const router = createRouter({
         {
             path: '/system/detail/6',
             name: 'Tenant',
+            component: () => import('../components/TabsContainer.vue'),
+            meta: {
+                title: '租户管理',
+                tabView: true,
+                activeTab: 'tenant'
+            }
+        },
+        {
+            path: '/system/detail/7',
+            name: 'CourseExamine',
             component: () => import('../components/TabsContainer.vue'),
             meta: {
                 title: '租户管理',

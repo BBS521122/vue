@@ -134,6 +134,7 @@ import {
 
 // 导入首页组件
 import HomeAdmin from '../views/home_admin.vue'
+import CourseDetail from '@/views/CourseDetail.vue';
 
 // 异步导入其他组件
 const UserControl = defineAsyncComponent(() => import('../views/user_control.vue'))
@@ -141,6 +142,8 @@ const DepartmentManagement = defineAsyncComponent(() => import('../views/Departm
 const NewManagement = defineAsyncComponent(() => import('../views/NewList.vue'))
 const Conference = defineAsyncComponent(() => import('../views/Conference.vue'))
 const Tenant = defineAsyncComponent(() => import('../views/tenant.vue'))
+const Course= defineAsyncComponent(() => import('../views/CourseList.vue'))
+const CourseExamine= defineAsyncComponent(() => import('../views/AuditList.vue'))
 
 const router = useRouter()
 const route = useRoute()
@@ -190,6 +193,14 @@ const tabConfigMap = {
     closable: true,
     icon: OfficeBuilding
   },
+  4: {
+    name: 'course',
+    title: '课程管理',
+    component: Course,
+    route: '/system/detail/4',
+    closable: true,
+    icon: OfficeBuilding
+  },
   5: {
     name: 'conference',
     title: '会议管理',
@@ -205,7 +216,42 @@ const tabConfigMap = {
     route: '/system/detail/6',
     closable: true,
     icon: UserFilled
+  },
+  7: {
+    name: 'course_examine',
+    title: '课程审核',
+    component: CourseExamine,
+    route: '/system/detail/7',
+    closable: true,
+    icon: UserFilled
+  },
+  courseDetail: {
+    name: 'course-detail',
+    title: '课程详情',
+    component: CourseDetail,
+    route: '/course/:id',
+    closable: true,
+    icon: null
   }
+}
+
+const addCourseDetailTab = (courseId) => {
+  const tabName = `course-detail-${courseId}`;
+
+  // 检查标签页是否已存在
+  if (!dynamicTabs.value.find(tab => tab.name === tabName)) {
+    dynamicTabs.value.push({
+      name: tabName,
+      title: `课程详情-${courseId}`,
+      component: CourseDetail,
+      route: `/course/${courseId}`,
+      closable: true,
+      modified: false,
+      loaded: false
+    });
+  }
+
+  activeTabName.value = tabName;
 }
 
 // 动态标签页数组

@@ -299,7 +299,6 @@ import { useRouter } from 'vue-router';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
-import CourseDetail from '@/views/CourseDetail.vue';
 
 export default {
   setup() {
@@ -313,7 +312,6 @@ export default {
         2: '已拒绝'
       }[state] || '未知状态';
     };
-
 
     // 数据状态
     const loading = ref(true);

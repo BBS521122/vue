@@ -47,24 +47,59 @@
       </el-col>
     </el-row>
 
-    <!-- 顶部筛选按钮 -->
-    <div class="mb-2">
-      <el-button type="primary" @click="filterByState('UNDER_CHECK')">审核中</el-button>
-      <el-button type="success" @click="filterByState('APPROVED')">已通过</el-button>
-      <el-button type="warning" @click="filterByState('ONGOING')">进行中</el-button>
-    </div>
+    <!-- 优化后的操作区域 -->
+    <div class="operation-area">
+      <!-- 筛选按钮组 -->
+      <div class="filter-buttons">
+        <el-button-group>
+          <el-button
+              type="primary"
+              @click="filterByState('UNDER_CHECK')"
+              :class="{ 'active': searchForm.status === 'UNDER_CHECK' }"
+          >
+            <el-icon><Clock /></el-icon>
+            审核中
+          </el-button>
+          <el-button
+              type="success"
+              @click="filterByState('APPROVED')"
+              :class="{ 'active': searchForm.status === 'APPROVED' }"
+          >
+            <el-icon><Check /></el-icon>
+            已通过
+          </el-button>
+          <el-button
+              type="warning"
+              @click="filterByState('ONGOING')"
+              :class="{ 'active': searchForm.status === 'ONGOING' }"
+          >
+            <el-icon><VideoPlay /></el-icon>
+            进行中
+          </el-button>
+        </el-button-group>
+      </div>
 
-    <!-- 新增按钮 -->
-    <div class="mb-2">
-      <el-button type="primary" @click="openDialog()">新增会议</el-button>
+      <!-- 新增按钮 -->
+      <div class="action-buttons">
+        <el-button type="primary" @click="openDialog()" size="default">
+          <el-icon><Plus /></el-icon>
+          新增会议
+        </el-button>
+      </div>
     </div>
 
     <!-- 表格 -->
-    <el-table :data="conferenceList" border>
-      <el-table-column prop="name" label="会议名称"/>
-      <el-table-column prop="userName" label="创建人"/>
-      <el-table-column prop="state" label="会议状态"/>
-      <el-table-column label="会议内容">
+    <el-table :data="conferenceList" border class="conference-table">
+      <el-table-column prop="name" label="会议名称" min-width="150"/>
+      <el-table-column prop="userName" label="创建人" width="120"/>
+      <el-table-column prop="state" label="会议状态" width="120">
+        <template #default="{ row }">
+          <el-tag :type="getStatusType(row.state)" size="small">
+            {{ row.state }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="会议内容" min-width="200">
         <template #default="{row}">
           <div class="content-cell">
             <div class="content-preview">{{ extractPureText(row.content) }}</div>
@@ -79,26 +114,62 @@
           </div>
         </template>
       </el-table-column>
-      <el-table-column prop="startTime" label="开始时间"/>
-      <el-table-column label="操作" width="240">
+      <el-table-column prop="startTime" label="开始时间" width="160"/>
+      <el-table-column label="操作" width="280" fixed="right">
         <template #default="scope">
-          <el-button type="primary" size="small" @click="openDialog(scope.row.id)">修改</el-button>
-          <el-button type="danger" size="small" @click="handleDelete(scope.row.id)">删除</el-button>
-          <el-button type="success" size="small" @click="handleApprove(scope.row.id)">审核</el-button>
-          <el-button type="info" size="small" @click="showParticipants(scope.row.id)">参会人员</el-button>
+          <div class="table-actions">
+            <el-button
+                type="primary"
+                size="small"
+                @click="openDialog(scope.row.id)"
+                plain
+            >
+              <el-icon><Edit /></el-icon>
+              修改
+            </el-button>
+            <el-button
+                type="success"
+                size="small"
+                @click="handleApprove(scope.row.id)"
+                plain
+            >
+              <el-icon><Check /></el-icon>
+              审核
+            </el-button>
+            <el-dropdown @command="(command) => handleDropdownCommand(command, scope.row.id)">
+              <el-button size="small" type="info" plain>
+                更多
+                <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="participants">
+                    <el-icon><User /></el-icon>
+                    参会人员
+                  </el-dropdown-item>
+                  <el-dropdown-item command="delete" divided>
+                    <el-icon><Delete /></el-icon>
+                    <span style="color: #f56c6c;">删除</span>
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </div>
         </template>
       </el-table-column>
     </el-table>
 
     <!-- 分页 -->
-    <div class="mt-4 text-right">
+    <div class="pagination-wrapper">
       <el-pagination
           background
-          layout="prev, pager, next"
+          layout="total, sizes, prev, pager, next, jumper"
           :total="total"
           :page-size="pageSize"
           :current-page="currentPage"
+          :page-sizes="[10, 20, 50, 100]"
           @current-change="handlePageChange"
+          @size-change="handleSizeChange"
       />
     </div>
 
@@ -303,11 +374,31 @@ import AddEditConferenceDialog from '../components/AddEditConferenceDialog.vue'
 import axios, {type CancelTokenSource} from "axios";
 import {ElMessage, ElMessageBox} from "element-plus";
 import dayjs from "dayjs";
+import {
+  Clock,
+  Check,
+  VideoPlay,
+  Plus,
+  Edit,
+  Delete,
+  User,
+  ArrowDown
+} from '@element-plus/icons-vue'
 
 export default defineComponent({
   name: 'ConferenceListView',
   methods: {dayjs},
-  components: {AddConferenceDialog: AddEditConferenceDialog},
+  components: {
+    AddConferenceDialog: AddEditConferenceDialog,
+    Clock,
+    Check,
+    VideoPlay,
+    Plus,
+    Edit,
+    Delete,
+    User,
+    ArrowDown
+  },
   setup() {
     const showDialog = ref(false)
     const dialogId = ref<number | undefined>(undefined)
@@ -380,6 +471,25 @@ export default defineComponent({
     const filterByState = (state: keyof typeof stateMap) => {
       searchForm.value.status = state
       handleSearch()
+    }
+
+    // 新增下拉菜单处理函数
+    const handleDropdownCommand = (command: string, id: number) => {
+      switch (command) {
+        case 'participants':
+          showParticipants(id)
+          break
+        case 'delete':
+          handleDelete(id)
+          break
+      }
+    }
+
+    // 新增页面大小改变处理函数
+    const handleSizeChange = (size: number) => {
+      pageSize.value = size
+      currentPage.value = 1
+      fetchConferenceList()
     }
 
     const showContentDialog = async (conference: Conference) => {
@@ -752,6 +862,7 @@ export default defineComponent({
       pageSize,
       total,
       handlePageChange,
+      handleSizeChange,
       fetchConferenceList,
       extractPureText,
       contentDialogVisible,
@@ -779,7 +890,8 @@ export default defineComponent({
       participantsDialogVisible,
       participantsList,
       currentConferenceName,
-      getParticipantStatusType
+      getParticipantStatusType,
+      handleDropdownCommand
     }
   }
 })

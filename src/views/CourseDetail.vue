@@ -2,16 +2,13 @@
   <div class="course-detail">
     <!-- 顶部导航 -->
     <div class="header-nav">
-      <a href="#" @click="goToHome">首页</a>
-      <a href="#">资讯管理</a>
-      <a href="#" @click="goToCourseList">课程管理</a>
       <a href="#" class="active">课程详情</a>
     </div>
 
     <!-- 操作按钮栏 -->
     <div class="action-bar">
       <button class="action-btn back-btn" @click="goBack">
-        <i class="fas fa-arrow-left"></i> 返回列表
+        <i class="fas fa-arrow-left"></i> 返回主界面
       </button>
       <button class="action-btn chapter-btn" @click="goToChapterDetail">
         <i class="fas fa-list"></i> 章节管理
@@ -194,7 +191,7 @@ export default {
 
         // 获取课程基本信息
         const courseResponse = await axios.get(
-            `http://localhost:8848/course/get-course-info?courseId=${courseId.value}`
+            `/course/get-course-info?courseId=${courseId.value}`
         );
 
         if (courseResponse.data && courseResponse.data.code === 200) {
@@ -206,7 +203,7 @@ export default {
 
         // 获取章节列表
         const chapterResponse = await axios.get(
-            `http://localhost:8848/course/get-chapter?courseId=${courseId.value}`
+            `/course/get-chapter?courseId=${courseId.value}`
         );
 
         if (chapterResponse.data && chapterResponse.data.code === 200) {
@@ -260,15 +257,7 @@ export default {
 
     // 导航方法
     const goBack = () => {
-      router.push({ name: 'CourseList' });
-    };
-
-    const goToHome = () => {
-      router.push({ name: 'RoleSelect' });
-    };
-
-    const goToCourseList = () => {
-      router.push({ name: 'CourseList' });
+      router.push({ name: 'admin' });
     };
 
     const goToChapterDetail = () => {
@@ -282,7 +271,7 @@ export default {
     const editCourse = () => {
       // 跳转到编辑页面或打开编辑模态框
       router.push({
-        name: 'CourseList',
+        name: 'admin',
         query: { edit: courseId.value }
       });
     };
@@ -303,12 +292,12 @@ export default {
     const confirmDelete = async () => {
       try {
         const response = await axios.get(
-            `http://localhost:8848/course/delete-course?courseId=${courseId.value}`
+            `/course/delete-course?courseId=${courseId.value}`
         );
 
         if (response.data && response.data.code === 200) {
           alert('课程删除成功！');
-          router.push({ name: 'CourseList' });
+          router.push({ name: 'admin' });
         } else {
           throw new Error(response.data?.message || '删除失败');
         }
@@ -341,8 +330,6 @@ export default {
       playChapterVideo, // 暴露 playChapterVideo 方法
       closeVideoModal,
       goBack,
-      goToHome,
-      goToCourseList,
       goToChapterDetail,
       editCourse,
       previewCourse,

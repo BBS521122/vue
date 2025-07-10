@@ -57,7 +57,9 @@
               @click="filterByState('UNDER_CHECK')"
               :class="{ 'active': searchForm.status === 'UNDER_CHECK' }"
           >
-            <el-icon><Clock /></el-icon>
+            <el-icon>
+              <Clock/>
+            </el-icon>
             审核中
           </el-button>
           <el-button
@@ -65,7 +67,9 @@
               @click="filterByState('APPROVED')"
               :class="{ 'active': searchForm.status === 'APPROVED' }"
           >
-            <el-icon><Check /></el-icon>
+            <el-icon>
+              <Check/>
+            </el-icon>
             已通过
           </el-button>
           <el-button
@@ -73,7 +77,9 @@
               @click="filterByState('ONGOING')"
               :class="{ 'active': searchForm.status === 'ONGOING' }"
           >
-            <el-icon><VideoPlay /></el-icon>
+            <el-icon>
+              <VideoPlay/>
+            </el-icon>
             进行中
           </el-button>
         </el-button-group>
@@ -82,7 +88,9 @@
       <!-- 新增按钮 -->
       <div class="action-buttons">
         <el-button type="primary" @click="openDialog()" size="default">
-          <el-icon><Plus /></el-icon>
+          <el-icon>
+            <Plus/>
+          </el-icon>
           新增会议
         </el-button>
       </div>
@@ -124,7 +132,9 @@
                 @click="openDialog(scope.row.id)"
                 plain
             >
-              <el-icon><Edit /></el-icon>
+              <el-icon>
+                <Edit/>
+              </el-icon>
               修改
             </el-button>
             <el-button
@@ -133,22 +143,36 @@
                 @click="handleApprove(scope.row.id)"
                 plain
             >
-              <el-icon><Check /></el-icon>
+              <el-icon>
+                <Check/>
+              </el-icon>
               审核
             </el-button>
             <el-dropdown @command="(command) => handleDropdownCommand(command, scope.row.id)">
               <el-button size="small" type="info" plain>
                 更多
-                <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                <el-icon class="el-icon--right">
+                  <ArrowDown/>
+                </el-icon>
               </el-button>
               <template #dropdown>
                 <el-dropdown-menu>
                   <el-dropdown-item command="participants">
-                    <el-icon><User /></el-icon>
+                    <el-icon>
+                      <User/>
+                    </el-icon>
                     参会人员
                   </el-dropdown-item>
+                  <el-dropdown-item command="enterMeeting" divided>
+                    <el-icon>
+                      <VideoCamera/>
+                    </el-icon>
+                    进入会议
+                  </el-dropdown-item>
                   <el-dropdown-item command="delete" divided>
-                    <el-icon><Delete /></el-icon>
+                    <el-icon>
+                      <Delete/>
+                    </el-icon>
                     <span style="color: #f56c6c;">删除</span>
                   </el-dropdown-item>
                 </el-dropdown-menu>
@@ -230,7 +254,9 @@
         <!-- 会议状态时间线 -->
         <div class="timeline-section">
           <h3 class="content-title">会议状态时间线</h3>
+          <!-- 修改后的时间线部分 -->
           <el-timeline :reverse="true" class="horizontal-timeline">
+            <!-- 会议开始和结束节点保持不变 -->
             <el-timeline-item
                 :timestamp="dayjs(currentConference?.startTime).format('YYYY-MM-DD HH:mm')"
                 :type="timelineStatus.startTime"
@@ -247,6 +273,7 @@
               会议结束
             </el-timeline-item>
 
+            <!-- 录屏节点 -->
             <el-timeline-item
                 v-if="timelineStatus.recording === 'success'"
                 size="large"
@@ -273,35 +300,112 @@
               无录屏
             </el-timeline-item>
 
-            <!-- 修改后的语音转文字节点 - 不可点击 -->
-            <el-timeline-item
-                v-if="timelineStatus.transcription === 'success'"
-                size="large"
-                type="success"
-            >
-              语音转文字成功
-            </el-timeline-item>
+            <!-- 语音转文字节点 - 只有当有录屏时才显示 -->
+            <template v-if="timelineStatus.recording === 'none'">
+              <el-timeline-item
+                  v-if="timelineStatus.transcription === 'success'"
+                  size="large"
+                  type="success"
+              >
+                <span class="action-item" @click="fetchTranscription">
+                  语音转文字成功 (点击查看)
+                </span>
+              </el-timeline-item>
+              <el-timeline-item
+                  v-if="timelineStatus.transcription === 'processing'"
+                  size="large"
+                  type="success"
+              >
+                语音转文字中
+              </el-timeline-item>
+              <el-timeline-item
+                  v-else
+                  size="large"
+                  type="danger"
+              >
+                <span>未把语音转成为文字</span>
+                <el-button
+                    type="text"
+                    size="small"
+                    @click="generateMindmap"
+                    :loading="generatingMindmap"
+                    class="generate-btn"
+                >
+                  语音转文字
+                </el-button>
+              </el-timeline-item>
+            </template>
 
-            <!-- 会议纪要和思维导图节点保持不变 -->
-            <el-timeline-item
-                v-if="timelineStatus.minutes === 'success'"
-                size="large"
-                type="success"
-            >
-              <span class="action-item" @click="fetchMinutesContent">
-                生成会议纪要成功 (点击查看)
-              </span>
-            </el-timeline-item>
+            <!-- 会议纪要和思维导图节点 - 只有当有语音转文字时才显示 -->
+            <template v-if="timelineStatus.transcription === 'none'">
+              <!-- 会议纪要节点 -->
+              <el-timeline-item
+                  v-if="timelineStatus.minutes === 'success'"
+                  size="large"
+                  type="success"
+              >
+                <span class="action-item" @click="fetchMinutesContent">
+                  生成会议纪要成功 (点击查看)
+                </span>
+              </el-timeline-item>
+              <el-timeline-item
+                  v-if="timelineStatus.minutes === 'processing'"
+                  size="large"
+                  type="warning"
+              >
+                <span>生成会议纪要中...</span>
+              </el-timeline-item>
+              <el-timeline-item
+                  v-else
+                  size="large"
+                  type="danger"
+              >
+                <span>未生成会议纪要</span>
+                <el-button
+                    type="text"
+                    size="small"
+                    @click="generateMinutes"
+                    :loading="generatingMinutes"
+                    class="generate-btn"
+                >
+                  生成会议纪要
+                </el-button>
+              </el-timeline-item>
 
-            <el-timeline-item
-                v-if="timelineStatus.mindmap === 'success'"
-                size="large"
-                type="success"
-            >
-              <span class="action-item" @click="fetchMindmapContent">
-                生成思维导图成功 (点击查看)
-              </span>
-            </el-timeline-item>
+              <!-- 思维导图节点 -->
+              <el-timeline-item
+                  v-if="timelineStatus.mindmap === 'success'"
+                  size="large"
+                  type="success"
+              >
+                <span class="action-item" @click="fetchMindmapContent">
+                  生成思维导图成功 (点击查看)
+                </span>
+              </el-timeline-item>
+              <el-timeline-item
+                  v-if="timelineStatus.minutes === 'processing'"
+                  size="large"
+                  type="warning"
+              >
+                <span>生成思维导图中...</span>
+              </el-timeline-item>
+              <el-timeline-item
+                  v-else
+                  size="large"
+                  type="danger"
+              >
+                <span>未生成思维导图</span>
+                <el-button
+                    type="text"
+                    size="small"
+                    @click="generateMindmap"
+                    :loading="generatingMindmap"
+                    class="generate-btn"
+                >
+                  生成思维导图
+                </el-button>
+              </el-timeline-item>
+            </template>
           </el-timeline>
         </div>
       </div>
@@ -373,7 +477,12 @@ import {defineComponent, ref} from 'vue'
 import AddEditConferenceDialog from '../components/AddEditConferenceDialog.vue'
 import axios, {type CancelTokenSource} from "axios";
 import {ElMessage, ElMessageBox} from "element-plus";
+import {VideoCamera} from '@element-plus/icons-vue'
 import dayjs from "dayjs";
+import {useRouter} from 'vue-router'
+
+// 在 setup 中
+
 import {
   Clock,
   Check,
@@ -397,9 +506,11 @@ export default defineComponent({
     Edit,
     Delete,
     User,
-    ArrowDown
+    ArrowDown,
+    VideoCamera
   },
   setup() {
+    const router = useRouter()
     const showDialog = ref(false)
     const dialogId = ref<number | undefined>(undefined)
     const contentDialogVisible = ref(false)
@@ -421,11 +532,12 @@ export default defineComponent({
     const timelineStatus = ref({
       startTime: 'grey',
       endTime: 'grey',
-      recording: 'none', // 'none' | 'success'
-      transcription: 'none', // 'none' | 'success' (保留但不可点击)
-      minutes: 'none',    // 'none' | 'success'
-      mindmap: 'none'     // 'none' | 'success'
+      recording: 'none', // 'none' | 'processing' | 'success'
+      transcription: 'none', // 'none' | 'processing' | 'success'
+      minutes: 'none',    // 'none' | 'processing' | 'success'
+      mindmap: 'none'     // 'none' | 'processing' | 'success'
     })
+
 
     interface Conference {
       id: number
@@ -479,9 +591,37 @@ export default defineComponent({
         case 'participants':
           showParticipants(id)
           break
+        case 'enterMeeting':
+          enterMeeting(id)  // 新增进入会议命令
+          break
         case 'delete':
           handleDelete(id)
           break
+      }
+    }
+
+    const enterMeeting = async (conferenceId: number) => {
+      try {
+        // 获取会议角色信息（这里假设API返回用户是否是创建者）
+        let role = 'user'
+        const conference = conferenceList.value.find(c => c.id === conferenceId)
+        if (!conference) {
+          throw new Error('会议不存在')
+        }
+        if (conference.userName === localStorage.getItem('username')) {
+          role = 'creator'
+        }
+        // 跳转到会议页面
+        router.push({
+          name: 'MeetingRole',
+          params: {
+            id: conferenceId,
+            role: role
+          }
+        })
+      } catch (err) {
+        ElMessage.error('进入会议失败')
+        console.error(err)
       }
     }
 
@@ -556,12 +696,12 @@ export default defineComponent({
           // 更新基础时间线状态
           timelineStatus.value.startTime = now.isAfter(dayjs(data.startTime)) ? 'success' : 'grey'
           timelineStatus.value.endTime = now.isAfter(dayjs(data.endTime)) ? 'success' : 'grey'
-          timelineStatus.value.recording = data.hasRecording ? 'success' : 'none'
+          timelineStatus.value.recording = data.hasRecording
 
           // 更新状态节点
-          timelineStatus.value.transcription = data.hasTranscription ? 'success' : 'none'
-          timelineStatus.value.minutes = data.hasMinutes ? 'success' : 'none'
-          timelineStatus.value.mindmap = data.hasMindmap ? 'success' : 'none'
+          timelineStatus.value.transcription = data.hasTranscription
+          timelineStatus.value.minutes = data.hasMinutes
+          timelineStatus.value.mindmap = data.hasMindmap
 
           // 保存录屏URL
           recordingUrl.value = data.recordingUrl || null
@@ -739,6 +879,23 @@ export default defineComponent({
       }
     }
 
+    const fetchTranscription = async () => {
+      try {
+        const res = await axios.get('/conference/get-transcription', {
+          params: {conferenceId: currentConference.value?.id}
+        })
+        if (res.data.code === 200) {
+          minutesContent.value = res.data.data.transcription
+          minutesDialogVisible.value = true
+        } else {
+          ElMessage.error(res.data.message || '语音转文字失败')
+        }
+      } catch (err) {
+        ElMessage.error('语音转文字失败')
+        console.error(err)
+      }
+    }
+
     const fetchMinutesContent = async () => {
       try {
         const res = await axios.get('/conference/get-minutes', {
@@ -847,6 +1004,81 @@ export default defineComponent({
       })
     }
 
+    // 在 setup 中添加状态
+    const generatingTranscription = ref(false)
+    const generatingMinutes = ref(false)
+    const generatingMindmap = ref(false)
+
+// 添加生成方法
+    const generateTranscription = async () => {
+      if (!currentConference.value?.id) return
+
+      generatingTranscription.value = true
+      try {
+        const res = await axios.post('/conference/generate-transcription', {
+          conferenceId: currentConference.value.id
+        })
+
+        if (res.data.code === 200) {
+          ElMessage.success('语音转文字中，请稍后刷新查看')
+          timelineStatus.value.minutes = 'processing'
+        } else {
+          ElMessage.error(res.data.message || '语音转文字失败')
+        }
+      } catch (err) {
+        ElMessage.error('生成会议纪要失败')
+        console.error(err)
+      } finally {
+        generatingTranscription.value = false
+      }
+    }
+
+    const generateMinutes = async () => {
+      if (!currentConference.value?.id) return
+
+      generatingMinutes.value = true
+      try {
+        const res = await axios.post('/conference/generate-minutes', {
+          conferenceId: currentConference.value.id
+        })
+
+        if (res.data.code === 200) {
+          ElMessage.success('会议纪要生成中，请稍后刷新查看')
+          timelineStatus.value.minutes = 'processing'
+        } else {
+          ElMessage.error(res.data.message || '生成会议纪要失败')
+        }
+      } catch (err) {
+        ElMessage.error('生成会议纪要失败')
+        console.error(err)
+      } finally {
+        generatingMinutes.value = false
+      }
+    }
+
+    const generateMindmap = async () => {
+      if (!currentConference.value?.id) return
+
+      generatingMindmap.value = true
+      try {
+        const res = await axios.post('/conference/generate-mindmap', {
+          conferenceId: currentConference.value.id
+        })
+
+        if (res.data.code === 200) {
+          ElMessage.success('思维导图生成中，请稍后刷新查看')
+          timelineStatus.value.mindmap = 'processing'
+        } else {
+          ElMessage.error(res.data.message || '生成思维导图失败')
+        }
+      } catch (err) {
+        ElMessage.error('生成思维导图失败')
+        console.error(err)
+      } finally {
+        generatingMindmap.value = false
+      }
+    }
+
     // 初始化获取数据
     fetchConferenceList()
 
@@ -882,6 +1114,7 @@ export default defineComponent({
       minutesContent,
       mindmapImageUrl,
       fetchMinutesContent,
+      fetchTranscription,
       fetchMindmapContent,
       downloadContent,
       fetchTimelineStatus,
@@ -891,8 +1124,12 @@ export default defineComponent({
       participantsList,
       currentConferenceName,
       getParticipantStatusType,
-      handleDropdownCommand
-    }
+      handleDropdownCommand,
+      generatingTranscription,
+      generatingMinutes,
+      generatingMindmap,
+      generateMinutes,
+      generateMindmap    }
   }
 })
 </script>

@@ -20,6 +20,12 @@ const router = createRouter({
             redirect: '/login'
         },
         {
+            path: '/meeting/:role(user|creator)/:id',
+            name: 'MeetingRole',
+            component: () => import('../views/MeetingRoom.vue'),
+            props: true
+        },
+        {
             path: '/login',
             name: 'login',
             component: () => import('../views/Login.vue'),

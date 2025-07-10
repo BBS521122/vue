@@ -44,53 +44,6 @@
       </div>
     </div>
 
-    <!-- 弹幕区域 -->
-    <div class="chat-area">
-      <div class="chat-header">
-        <h3>聊天</h3>
-        <button
-            v-if="isCreator"
-            @click="toggleMuteAll"
-            :class="['mute-button', { active: isMuteAll }]"
-        >
-          {{ isMuteAll ? '解除禁言' : '全体禁言' }}
-        </button>
-      </div>
-
-      <div class="chat-messages" ref="chatMessagesRef">
-        <div
-            v-for="message in messages"
-            :key="message.id"
-            :class="['message', { creator: message.isCreator }]"
-        >
-          <div class="message-header">
-            <span class="message-author">
-              {{ message.isCreator ? '主持人' : `用户${message.peerId.slice(-4)}` }}
-            </span>
-            <span class="message-time">
-              {{ formatTime(message.timestamp) }}
-            </span>
-          </div>
-          <div class="message-content">{{ message.content }}</div>
-        </div>
-      </div>
-
-      <div class="chat-input" v-if="!isMuteAll || isCreator">
-        <input
-            v-model="newMessage"
-            @keyup.enter="sendMessage"
-            placeholder="输入消息..."
-            :disabled="isSending"
-        />
-        <button @click="sendMessage" :disabled="!newMessage.trim() || isSending">
-          发送
-        </button>
-      </div>
-      <div v-else class="mute-notice">
-        您已被禁言
-      </div>
-    </div>
-
     <!-- 控制栏 -->
     <div class="control-bar">
       <div class="control-group">
@@ -221,6 +174,7 @@
 import {ref, reactive, onMounted, onUnmounted, nextTick, watch, computed} from 'vue';
 import MediaSoupClientService from '../MediaSoupClient.ts';
 import {ElMessageBox, ElMessage} from 'element-plus'
+import router from "@/router/index.js";
 
 export default {
   name: 'MeetingRoom',
@@ -1262,6 +1216,7 @@ export default {
 
         // 触发离开事件
         emit('leave');
+        router.go(-1);
 
         console.log('✅ 已离开会议');
       } catch (error) {

@@ -68,7 +68,7 @@
         </el-form-item>
 
         <div class="register-link">
-          还没有账号？
+          企业注册入口
           <el-link type="primary" @click="goToRegister">立即注册</el-link>
         </div>
       </el-form>

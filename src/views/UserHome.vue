@@ -56,46 +56,9 @@
             <div class="course-card">
               <div class="course-image">
                 <img :src="course.image" :alt="course.title"/>
-                <div
-                    class="course-tag"
-                    :class="{
-                    'tag-active': course.tag === '进行中',
-                    'tag-finished': course.tag === '已结束'
-                  }"
-                >
-                  {{ course.tag }}
-                </div>
               </div>
               <div class="course-content">
                 <h3 class="course-title">{{ course.title }}</h3>
-                <p class="course-description">{{ course.description }}</p>
-                <div class="course-stats">
-                  <div class="stat-item">
-                    <el-icon>
-                      <User/>
-                    </el-icon>
-                    <span>{{ course.students }}人</span>
-                  </div>
-                  <div class="stat-item">
-                    <el-icon>
-                      <Star/>
-                    </el-icon>
-                    <span>{{ course.rating }}</span>
-                  </div>
-                  <div class="stat-item">
-                    <el-icon>
-                      <View/>
-                    </el-icon>
-                    <span>{{ course.views }}</span>
-                  </div>
-                </div>
-                <div class="course-footer">
-                  <el-tag size="small"
-                          :type="course.status === '必修课' ? 'danger' : course.status === '实训课程' ? 'warning' : 'info'">
-                    {{ course.status }}
-                  </el-tag>
-                  <span class="course-duration">{{ course.duration }}学时</span>
-                </div>
               </div>
             </div>
           </el-carousel-item>
@@ -252,38 +215,17 @@ const courseList = ref([
   {
     id: 3,
     title: '行业动态管理子系统',
-    description: '《软件系统设计实训》是一门软件工程专业实训课程，培养学生系统设计能力',
     image: newsManagementImage,
-    tag: '已结束',
-    students: 32,
-    rating: 4.6,
-    views: 296,
-    duration: '2.5',
-    status: '实训课程'
   },
   {
     id: 4,
     title: '课程管理子系统',
-    description: '《软件需求分析与设计》为全日制大学本科软件工程专业的专业课程',
     image: conferenceImage,
-    tag: '已结束',
-    students: 48,
-    rating: 4.8,
-    views: 284,
-    duration: '3.0',
-    status: '必修课'
   },
   {
     id: 5,
     title: '会议管理子系统',
-    description: '会议管理子系统涵盖会议预订、会议室管理、会议通知等核心功能模块',
     image: conferenceImage,
-    tag: '已结束',
-    students: 48,
-    rating: 4.8,
-    views: 284,
-    duration: '1.8',
-    status: '必修课'
   }
 ])
 

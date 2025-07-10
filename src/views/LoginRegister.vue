@@ -7,15 +7,15 @@
       </div>
 
       <el-form
-          ref="registerForm"
+          ref="registerFormRef"
           :model="registerForm"
           :rules="registerRules"
           class="register-form"
       >
-        <el-form-item prop="username">
+        <el-form-item prop="contactPerson">
           <el-input
-              v-model="registerForm.username"
-              placeholder="请输入用户名"
+              v-model="registerForm.contactPerson"
+              placeholder="请输入账号"
               prefix-icon="User"
               clearable
           />
@@ -31,30 +31,20 @@
           />
         </el-form-item>
 
-        <el-form-item prop="confirmPassword">
-          <el-input
-              v-model="registerForm.confirmPassword"
-              placeholder="请确认密码"
-              prefix-icon="Lock"
-              show-password
-              clearable
-          />
-        </el-form-item>
-
-        <el-form-item prop="email">
-          <el-input
-              v-model="registerForm.email"
-              placeholder="请输入邮箱"
-              prefix-icon="Message"
-              clearable
-          />
-        </el-form-item>
-
         <el-form-item prop="phone">
           <el-input
               v-model="registerForm.phone"
               placeholder="请输入手机号"
               prefix-icon="Phone"
+              clearable
+          />
+        </el-form-item>
+
+        <el-form-item prop="name">
+          <el-input
+              v-model="registerForm.name"
+              placeholder="请输入企业名称"
+              prefix-icon="User"
               clearable
           />
         </el-form-item>
@@ -82,64 +72,53 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import axios from 'axios'
 
 export default {
   setup() {
     const router = useRouter()
+    const registerFormRef = ref(null)
     const registerForm = reactive({
-      username: '',
+      name: '',
+      contactPerson: '',
       password: '',
-      confirmPassword: '',
-      email: '',
       phone: ''
     })
 
-    const validatePassword = (rule, value, callback) => {
-      if (value !== registerForm.password) {
-        callback(new Error('两次输入的密码不一致'))
-      } else {
-        callback()
-      }
-    }
-
     const registerRules = reactive({
-      username: [
-        { required: true, message: '请输入用户名', trigger: 'blur' },
-        { min: 3, max: 20, message: '长度在3到20个字符', trigger: 'blur' }
-      ],
       password: [
-        { required: true, message: '请输入密码', trigger: 'blur' },
-        { min: 6, max: 20, message: '长度在6到20个字符', trigger: 'blur' }
+        {required: true, message: '请输入密码', trigger: 'blur'},
+        {min: 6, max: 20, message: '长度在6到20个字符', trigger: 'blur'}
       ],
-      confirmPassword: [
-        { required: true, message: '请再次输入密码', trigger: 'blur' },
-        { validator: validatePassword, trigger: 'blur' }
-      ],
-      email: [
-        { required: true, message: '请输入邮箱', trigger: 'blur' },
-        { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' }
-      ],
-      phone: [
-        { required: true, message: '请输入手机号', trigger: 'blur' },
-        { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号格式', trigger: 'blur' }
+      name: [
+        {required: true, message: '请输入企业名称', trigger: 'blur'}
       ]
     })
 
     const loading = ref(false)
 
-    const handleRegister = () => {
-      registerFormRef.value.validate(valid => {
-        if (valid) {
-          loading.value = true
-          // 这里执行注册API调用
-          console.log('注册信息:', registerForm)
-          setTimeout(() => {
-            loading.value = false
-            ElMessage.success('注册成功')
-            router.push('/login')
-          }, 1000)
+    const handleRegister = async () => {
+      try {
+        loading.value = true
+        // 先验证表单
+        await registerFormRef.value.validate()
+        // 发送请求
+        const res = await axios.post('/tenant/register', registerForm)
+        if (res.data.code === 200) {
+          ElMessage.success('注册成功')
+          router.push('/login')
+        } else {
+          ElMessage.error(res.data.message)
         }
-      })
+      } catch (error) {
+        if (error.response) {
+          ElMessage.error(error.response.data.message || '注册失败')
+        } else if (!error.message.includes('validate')) {
+          ElMessage.error('请求失败，请检查网络')
+        }
+      } finally {
+        loading.value = false
+      }
     }
 
     const goToLogin = () => {
@@ -147,6 +126,7 @@ export default {
     }
 
     return {
+      registerFormRef,
       registerForm,
       registerRules,
       loading,
@@ -178,6 +158,26 @@ export default {
   z-index: 1;
 }
 
+.logo-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.logo {
+  width: 80px; /* 控制logo宽度 */
+  height: 80px; /* 控制logo高度 */
+  object-fit: contain; /* 保持图片比例 */
+  margin-bottom: 10px;
+}
+
+.system-name {
+  font-size: 18px;
+  color: #333;
+  margin: 0;
+}
+
 .register-btn {
   width: 100%;
   height: 45px;
@@ -190,10 +190,5 @@ export default {
   margin-top: 20px;
   color: #606266;
   font-size: 14px;
-}
-
-/* 复用登录页的部分样式 */
-.logo-area, .system-name, .logo {
-  /* 保持与登录页一致 */
 }
 </style>

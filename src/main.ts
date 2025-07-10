@@ -6,6 +6,7 @@ import ElementPlus from 'element-plus'
 import axios from "axios";
 
 
+// @ts-ignore
 import App from './App.vue'
 import router from './router'
 

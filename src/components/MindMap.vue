@@ -347,7 +347,7 @@ export default {
         }
       }
 
-      // CollapseExpandTree behavior
+      // Modified CollapseExpandTree behavior - DISABLED POINTER MOVE EVENTS
       class CollapseExpandTree extends BaseBehavior {
         constructor(context, options) {
           super(context, options);
@@ -362,20 +362,23 @@ export default {
 
         bindEvents() {
           const { graph } = this.context;
-          graph.on(NodeEvent.POINTER_ENTER, this.showIcon);
-          graph.on(NodeEvent.POINTER_LEAVE, this.hideIcon);
+          // REMOVED: Pointer move events that cause high CPU usage
+          // graph.on(NodeEvent.POINTER_ENTER, this.showIcon);
+          // graph.on(NodeEvent.POINTER_LEAVE, this.hideIcon);
           graph.on(TreeEvent.COLLAPSE_EXPAND, this.onCollapseExpand);
         }
 
         unbindEvents() {
           const { graph } = this.context;
-          graph.off(NodeEvent.POINTER_ENTER, this.showIcon);
-          graph.off(NodeEvent.POINTER_LEAVE, this.hideIcon);
+          // REMOVED: Pointer move events that cause high CPU usage
+          // graph.off(NodeEvent.POINTER_ENTER, this.showIcon);
+          // graph.off(NodeEvent.POINTER_LEAVE, this.hideIcon);
           graph.off(TreeEvent.COLLAPSE_EXPAND, this.onCollapseExpand);
         }
 
         status = 'idle';
 
+        // Keep methods but don't bind them to events
         showIcon = (event) => {
           this.setIcon(event, true);
         };
@@ -463,6 +466,8 @@ export default {
               labelBackground: true,
               labelBackgroundFill: 'transparent',
               labelPadding: direction === 'left' ? [2, 0, 10, 40] : [2, 40, 10, 0],
+              // Always show icons since hover events are disabled
+              showIcon: true,
               ...(isRoot ? {
                 fill: '#EFF0F0',
                 labelFill: '#262626',
@@ -504,9 +509,28 @@ export default {
         animation: false,
       });
 
+      // Add event listener to disable pointer events on the canvas to prevent CPU spikes
       this.graph.once(GraphEvent.AFTER_RENDER, () => {
         if (this.autoFit) {
           this.graph.fitView();
+        }
+
+        // Disable pointer events that cause performance issues
+        const canvas = this.$refs.mindmapContainer.querySelector('canvas');
+        if (canvas) {
+          canvas.style.pointerEvents = 'auto'; // Keep basic interactions
+          // Add throttling to prevent excessive event firing
+          let throttleTimer = null;
+          const originalOnPointerMove = canvas.onpointermove;
+          canvas.onpointermove = (event) => {
+            if (throttleTimer) return;
+            throttleTimer = setTimeout(() => {
+              throttleTimer = null;
+            }, 16); // Throttle to ~60fps
+            if (originalOnPointerMove) {
+              originalOnPointerMove.call(canvas, event);
+            }
+          };
         }
       });
 
@@ -546,6 +570,11 @@ export default {
 .mindmap-canvas {
   width: 100%;
   height: 100%;
+  /* Disable text selection to prevent unnecessary events */
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
 }
 
 .loading-overlay {

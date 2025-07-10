@@ -38,7 +38,7 @@ export default {
       type: Object,
       required: true,
       validator(value) {
-        return value && value.id && (value.children || typeof value.children === 'undefined');
+        return value && value.id;
       }
     },
     width: {
@@ -85,25 +85,25 @@ export default {
       this.graph.destroy();
     }
   },
-  watch: {
-    data: {
-      handler(newData) {
-        if (newData && this.graph) {
-          this.updateMindmap(newData);
-        }
-      },
-      deep: true
-    },
-    colors: {
-      handler(newColors) {
-        if (newColors && this.graph) {
-          this.currentColors = [...newColors];
-          this.updateMindmap(this.data);
-        }
-      },
-      deep: true
-    }
-  },
+  // watch: {
+  //   data: {
+  //     handler(newData) {
+  //       if (newData && this.graph) {
+  //         this.updateMindmap(newData);
+  //       }
+  //     },
+  //     deep: true
+  //   },
+  //   colors: {
+  //     handler(newColors) {
+  //       if (newColors && this.graph) {
+  //         this.currentColors = [...newColors];
+  //         this.updateMindmap(this.data);
+  //       }
+  //     },
+  //     deep: true
+  //   }
+  // },
   methods: {
     // Convert reactive Vue data to plain JavaScript objects
     toPlainObject(obj) {
@@ -116,6 +116,7 @@ export default {
 
       try {
         // Convert reactive data to plain objects
+        console.log('data在这里:', this.data)
         this.currentData = this.toPlainObject(this.data);
         this.currentColors = [...this.colors];
 
@@ -537,34 +538,35 @@ export default {
       this.graph.render();
     },
 
-    updateMindmap(newData) {
-      try {
-        // Convert reactive data to plain objects
-        this.currentData = this.toPlainObject(newData);
-        this.currentColors = [...this.colors];
-
-        const processedData = this.validateAndProcessData(this.currentData);
-        const graphData = treeToGraphData(processedData);
-
-        this.graph.read(graphData);
-        this.graph.render();
-
-        if (this.autoFit) {
-          this.graph.fitView();
-        }
-      } catch (err) {
-        this.error = `Failed to update mindmap: ${err.message}`;
-      }
-    }
+    // updateMindmap(newData) {
+    //   try {
+    //     // Convert reactive data to plain objects
+    //     this.currentData = this.toPlainObject(newData);
+    //     this.currentColors = [...this.colors];
+    //
+    //     const processedData = this.validateAndProcessData(this.currentData);
+    //     const graphData = treeToGraphData(processedData);
+    //
+    //     this.graph.read(graphData);
+    //     this.graph.render();
+    //
+    //     if (this.autoFit) {
+    //       this.graph.fitView();
+    //     }
+    //   } catch (err) {
+    //     this.error = `Failed to update mindmap: ${err.message}`;
+    //   }
+    // }
   }
 };
 </script>
 
 <style scoped>
 .mindmap-container {
-  position: relative;
-  width: 100%;
-  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 70%;
 }
 
 .mindmap-canvas {

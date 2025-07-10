@@ -2,8 +2,8 @@
   <div class="register-container">
     <div class="register-box">
       <div class="logo-area">
-        <img src="@/assets/logo.svg" alt="测盟汇管理系统" class="logo">
-        <h1 class="system-name">用户注册</h1>
+        <img src="@/assets/logo.jpg" alt="测盟汇管理系统" class="logo">
+        <h1 class="system-name">测盟汇管理系统</h1>
       </div>
 
       <el-form
@@ -163,16 +163,19 @@ export default {
   justify-content: center;
   align-items: center;
   height: 100vh;
-  background: url('@/assets/login-bg.jpg') no-repeat center center;
+  background: url('@/assets/背景.jpg') no-repeat center center;
   background-size: cover;
+  position: relative;
 }
 
 .register-box {
-  width: 450px;
+  width: 420px;
   padding: 40px;
   background-color: rgba(255, 255, 255, 0.9);
   border-radius: 8px;
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+  position: relative;
+  z-index: 1;
 }
 
 .register-btn {

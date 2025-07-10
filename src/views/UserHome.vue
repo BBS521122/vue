@@ -139,6 +139,9 @@ import {ref, onMounted} from 'vue'
 import {useRouter} from "vue-router";
 import axios from "axios";
 import {ElMessage} from "element-plus";
+import conferenceImage from '@/assets/会议管理.jpg'
+import newsManagementImage from '@/assets/行业动态.jpg'
+import courseManagementImage from '@/assets/课程管理.jpg'
 import {
   ArrowLeft,
   ArrowRight,
@@ -250,7 +253,7 @@ const courseList = ref([
     id: 3,
     title: '行业动态管理子系统',
     description: '《软件系统设计实训》是一门软件工程专业实训课程，培养学生系统设计能力',
-    image: 'https://via.placeholder.com/400x200?text=行业动态管理&bg=e6a23c&color=fff',
+    image: newsManagementImage,
     tag: '已结束',
     students: 32,
     rating: 4.6,
@@ -262,7 +265,7 @@ const courseList = ref([
     id: 4,
     title: '课程管理子系统',
     description: '《软件需求分析与设计》为全日制大学本科软件工程专业的专业课程',
-    image: 'https://via.placeholder.com/400x200?text=课程管理子系统&bg=f56c6c&color=fff',
+    image: conferenceImage,
     tag: '已结束',
     students: 48,
     rating: 4.8,
@@ -274,7 +277,7 @@ const courseList = ref([
     id: 5,
     title: '会议管理子系统',
     description: '会议管理子系统涵盖会议预订、会议室管理、会议通知等核心功能模块',
-    image: 'https://via.placeholder.com/400x200?text=会议管理子系统&bg=909399&color=fff',
+    image: conferenceImage,
     tag: '已结束',
     students: 48,
     rating: 4.8,

@@ -49,42 +49,6 @@
 
     <!-- 优化后的操作区域 -->
     <div class="operation-area">
-      <!-- 筛选按钮组 -->
-      <div class="filter-buttons">
-        <el-button-group>
-          <el-button
-              type="primary"
-              @click="filterByState('UNDER_CHECK')"
-              :class="{ 'active': searchForm.status === 'UNDER_CHECK' }"
-          >
-            <el-icon>
-              <Clock/>
-            </el-icon>
-            审核中
-          </el-button>
-          <el-button
-              type="success"
-              @click="filterByState('APPROVED')"
-              :class="{ 'active': searchForm.status === 'APPROVED' }"
-          >
-            <el-icon>
-              <Check/>
-            </el-icon>
-            已通过
-          </el-button>
-          <el-button
-              type="warning"
-              @click="filterByState('ONGOING')"
-              :class="{ 'active': searchForm.status === 'ONGOING' }"
-          >
-            <el-icon>
-              <VideoPlay/>
-            </el-icon>
-            进行中
-          </el-button>
-        </el-button-group>
-      </div>
-
       <!-- 新增按钮 -->
       <div class="action-buttons">
         <el-button type="primary" @click="openDialog()" size="default">
@@ -282,14 +246,6 @@
               <span class="recording-item" @click="playRecording">
                 录屏上传成功 (点击播放)
               </span>
-              <el-button
-                  type="text"
-                  size="small"
-                  @click="handleDeleteRecording"
-                  class="delete-recording-btn"
-              >
-                删除
-              </el-button>
             </el-timeline-item>
 
             <el-timeline-item
@@ -301,14 +257,14 @@
             </el-timeline-item>
 
             <!-- 语音转文字节点 - 只有当有录屏时才显示 -->
-            <template v-if="timelineStatus.recording === 'none'">
+            <template v-if="timelineStatus.recording === 'success'">
               <el-timeline-item
                   v-if="timelineStatus.transcription === 'success'"
                   size="large"
                   type="success"
               >
-                <span class="action-item" @click="fetchTranscription">
-                  语音转文字成功 (点击查看)
+                <span class="action-item">
+                  语音转文字成功
                 </span>
               </el-timeline-item>
               <el-timeline-item
@@ -319,7 +275,7 @@
                 语音转文字中
               </el-timeline-item>
               <el-timeline-item
-                  v-else
+                  v-if="timelineStatus.transcription === 'none'"
                   size="large"
                   type="danger"
               >
@@ -337,7 +293,7 @@
             </template>
 
             <!-- 会议纪要和思维导图节点 - 只有当有语音转文字时才显示 -->
-            <template v-if="timelineStatus.transcription === 'none'">
+            <template v-if="timelineStatus.transcription === 'success'">
               <!-- 会议纪要节点 -->
               <el-timeline-item
                   v-if="timelineStatus.minutes === 'success'"
@@ -356,7 +312,7 @@
                 <span>生成会议纪要中...</span>
               </el-timeline-item>
               <el-timeline-item
-                  v-else
+                  v-if="timelineStatus.minutes === 'none'"
                   size="large"
                   type="danger"
               >
@@ -383,14 +339,14 @@
                 </span>
               </el-timeline-item>
               <el-timeline-item
-                  v-if="timelineStatus.minutes === 'processing'"
+                  v-if="timelineStatus.mindmap === 'processing'"
                   size="large"
                   type="warning"
               >
                 <span>生成思维导图中...</span>
               </el-timeline-item>
               <el-timeline-item
-                  v-else
+                  v-if="timelineStatus.mindmap === 'none'"
                   size="large"
                   type="danger"
               >
@@ -442,14 +398,15 @@
         fullscreen
     >
       <div class="mindmap-container">
-        <img :src="mindmapImageUrl" alt="会议思维导图" v-if="mindmapImageUrl">
-        <div v-else>加载中...</div>
+        <MindMap
+            :data="mindmapData"
+            :width="1000"
+            :height="700"
+            :colors="customColors"
+            :max-depth="3"
+            :auto-fit="true"
+        />
       </div>
-      <template #footer>
-        <el-button type="primary" @click="downloadContent(mindmapImageUrl, '思维导图.png', 'image/png')">
-          下载图片
-        </el-button>
-      </template>
     </el-dialog>
 
     <!-- 参会人员对话框 -->
@@ -493,11 +450,13 @@ import {
   User,
   ArrowDown
 } from '@element-plus/icons-vue'
+import MindMap from "@/components/MindMap.vue";
 
 export default defineComponent({
   name: 'ConferenceListView',
   methods: {dayjs},
   components: {
+    MindMap,
     AddConferenceDialog: AddEditConferenceDialog,
     Clock,
     Check,
@@ -521,6 +480,7 @@ export default defineComponent({
     const recordingUrl = ref<string | null>(null)
     const minutesDialogVisible = ref(false)
     const mindmapDialogVisible = ref(false)
+    const transcription = ref('')
     const minutesContent = ref('')
     const mindmapImageUrl = ref('')
     const timelineLoading = ref(false)
@@ -701,7 +661,7 @@ export default defineComponent({
           // 更新状态节点
           timelineStatus.value.transcription = data.hasTranscription
           timelineStatus.value.minutes = data.hasMinutes
-          timelineStatus.value.mindmap = data.hasMindmap
+          timelineStatus.value.mindmap = data.hasMindMap
 
           // 保存录屏URL
           recordingUrl.value = data.recordingUrl || null
@@ -752,7 +712,7 @@ export default defineComponent({
 
     interface SearchRequestBody {
       keyword: string | null;
-      status: string | null;
+      state: string | null;
       startTime: any | null;
       endTime: any | null;
 
@@ -770,7 +730,7 @@ export default defineComponent({
       try {
         const requestBody: SearchRequestBody = {
           keyword: searchForm.value.keyword?.trim() || null,
-          status: searchForm.value.status || null,
+          state: searchForm.value.status || null,
           startTime: searchForm.value.dateRange?.[0] || null,
           endTime: searchForm.value.dateRange?.[1] || null
         }
@@ -854,25 +814,6 @@ export default defineComponent({
       })
     }
 
-    const handleDeleteRecording = async () => {
-      try {
-        const res = await axios.post('/conference/delete-recording', {
-          conferenceId: currentConference.value?.id
-        })
-
-        if (res.data.code === 200) {
-          ElMessage.success('删除录屏成功')
-          timelineStatus.value.recording = 'none'
-          recordingUrl.value = null
-        } else {
-          ElMessage.error(res.data.message || '删除录屏失败')
-        }
-      } catch (err) {
-        ElMessage.error('删除录屏失败')
-        console.error(err)
-      }
-    }
-
     const playRecording = () => {
       if (recordingUrl.value) {
         window.open(recordingUrl.value, '_blank')
@@ -885,7 +826,7 @@ export default defineComponent({
           params: {conferenceId: currentConference.value?.id}
         })
         if (res.data.code === 200) {
-          minutesContent.value = res.data.data.transcription
+          transcription.value = res.data.data.transcription
           minutesDialogVisible.value = true
         } else {
           ElMessage.error(res.data.message || '语音转文字失败')
@@ -902,7 +843,7 @@ export default defineComponent({
           params: {conferenceId: currentConference.value?.id}
         })
         if (res.data.code === 200) {
-          minutesContent.value = res.data.data.content
+          minutesContent.value = res.data.data
           minutesDialogVisible.value = true
         } else {
           ElMessage.error(res.data.message || '获取会议纪要失败')
@@ -913,6 +854,8 @@ export default defineComponent({
       }
     }
 
+    const mindmapData = ref(null);
+
     const fetchMindmapContent = async () => {
       try {
         const res = await axios.get('/conference/get-mindmap', {
@@ -920,11 +863,9 @@ export default defineComponent({
         })
         if (res.data.code === 200) {
           // 假设返回的JSON数据可以直接用于渲染思维导图
-          const mindmapData = res.data.data.json
-
-          // 这里可以调用渲染思维导图的函数
-          renderMindmap(mindmapData)
-
+          console.log(res.data.data);
+          mindmapData.value = JSON.parse(res.data.data);
+          console.log(mindmapData);
           mindmapDialogVisible.value = true
         } else {
           ElMessage.error(res.data.message || '获取思维导图失败')
@@ -1038,9 +979,7 @@ export default defineComponent({
 
       generatingMinutes.value = true
       try {
-        const res = await axios.post('/conference/generate-minutes', {
-          conferenceId: currentConference.value.id
-        })
+        const res = await axios.get(`/conference/generate-minutes?conferenceId=${currentConference.value.id}`)
 
         if (res.data.code === 200) {
           ElMessage.success('会议纪要生成中，请稍后刷新查看')
@@ -1061,9 +1000,7 @@ export default defineComponent({
 
       generatingMindmap.value = true
       try {
-        const res = await axios.post('/conference/generate-mindmap', {
-          conferenceId: currentConference.value.id
-        })
+        const res = await axios.get(`/conference/generate-mindmap?conferenceId=${currentConference.value.id}`)
 
         if (res.data.code === 200) {
           ElMessage.success('思维导图生成中，请稍后刷新查看')
@@ -1108,7 +1045,6 @@ export default defineComponent({
       handleApprove,
       timelineStatus,
       playRecording,
-      handleDeleteRecording,
       minutesDialogVisible,
       mindmapDialogVisible,
       minutesContent,
@@ -1129,7 +1065,13 @@ export default defineComponent({
       generatingMinutes,
       generatingMindmap,
       generateMinutes,
-      generateMindmap    }
+      generateMindmap,
+      mindmapData,
+      customColors: [
+        '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FECA57',
+        '#FF9FF3', '#54A0FF', '#5F27CD', '#00D2D3', '#FF9F43'
+      ]
+    }
   }
 })
 </script>

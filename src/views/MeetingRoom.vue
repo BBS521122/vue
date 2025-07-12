@@ -99,17 +99,6 @@
           录制中... {{ formatRecordingDuration(recordingDuration) }}
         </div>
 
-        <!-- 扩展不可用提示 -->
-        <div
-            v-if="isCreator && !extensionAvailable"
-            class="control-button extension-warning"
-            title="请安装 MediaSoup Tab Recorder 扩展"
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
-          </svg>
-          扩展未安装
-        </div>
       </div>
 
       <div class="control-group">
@@ -1200,9 +1189,8 @@ export default {
     async function leaveMeeting() {
       try {
         console.log('🚪 准备离开会议...');
-
         // 如果是创建者且正在录制，先停止录制
-        if (isCreator.value && isExtensionRecording.value) {
+        if (isCreator.value ) {
           console.log('⏹️ 离开前停止录制...');
           try {
             await stopAutoRecording();
@@ -1413,10 +1401,10 @@ export default {
         console.log('⚠️ 非创建者无法停止录制');
         return;
       }
-      if (!isExtensionRecording.value) {
-        console.log('⚠️ 当前没有进行录制');
-        return;
-      }
+      // if (!isExtensionRecording.value) {
+      //   console.log('⚠️ 当前没有进行录制');
+      //   return;
+      // }
       console.log('⏹️ 准备自动停止录制...');
       try {
         sendStopRecordingToExtension();

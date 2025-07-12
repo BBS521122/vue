@@ -283,8 +283,8 @@
                 <el-button
                     type="text"
                     size="small"
-                    @click="generateMindmap"
-                    :loading="generatingMindmap"
+                    @click="generateTranscription"
+                    :loading="generatingTranscription"
                     class="generate-btn"
                 >
                   语音转文字
@@ -956,9 +956,7 @@ export default defineComponent({
 
       generatingTranscription.value = true
       try {
-        const res = await axios.post('/conference/generate-transcription', {
-          conferenceId: currentConference.value.id
-        })
+        const res = await axios.get(`/conference/generate-transcription?conferenceId=${currentConference.value.id}`)
 
         if (res.data.code === 200) {
           ElMessage.success('语音转文字中，请稍后刷新查看')
@@ -1066,6 +1064,7 @@ export default defineComponent({
       generatingMindmap,
       generateMinutes,
       generateMindmap,
+      generateTranscription,
       mindmapData,
       customColors: [
         '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FECA57',

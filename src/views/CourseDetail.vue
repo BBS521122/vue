@@ -257,7 +257,12 @@ export default {
 
     // 导航方法
     const goBack = () => {
-      router.push({ name: 'admin' });
+      if(localStorage.getItem("role")==="ADMIN"){
+        router.push({ name: 'admin' });
+      }
+      else{
+        router.push({ name: 'user' });
+      }
     };
 
     const goToChapterDetail = () => {

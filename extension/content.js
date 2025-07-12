@@ -5,11 +5,14 @@ console.log('content script loaded');
 
     // Inject the script into the page context
     function injectScript() {
+        console.log('Injecting script...');
         const script = document.createElement('script');
         script.src = chrome.runtime.getURL('injected_script.js');
         script.onload = function() {
+            console.log('Script injected successfully!');
             this.remove();
         };
+        script.onerror = () => console.error('Script injection failed!');
         (document.head || document.documentElement).appendChild(script);
     }
 
